@@ -16,7 +16,7 @@ interface SessionContextType {
   currentUser: UserProfile | null;
   activePropertyId: string;
   setActivePropertyId: (id: string) => void;
-  login: (email: string) => Promise<boolean>;
+  login: (email: string, password?: string) => Promise<boolean>;
   logout: () => void;
   hasPermission: (allowedRoles?: StaffRole[]) => boolean;
 }
@@ -97,7 +97,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string): Promise<boolean> => {
+  const login = async (email: string, password?: string): Promise<boolean> => {
+    // Enforce password check for SAAS_OWNER profile
+    if (email.toLowerCase() === "owner@hotelos.com") {
+      if (password !== "NayanOS#2026") {
+        return false;
+      }
+    }
+
     const found = MOCK_STAFF_DIRECTORY.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (found) {
       setCurrentUser(found);

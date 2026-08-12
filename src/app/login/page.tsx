@@ -15,9 +15,9 @@ export default function LoginPage() {
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!emailInput) return;
-    const success = await login(emailInput);
+    const success = await login(emailInput, passwordInput);
     if (!success) {
-      setErrorMsg("Invalid credentials. Try Rajesh's email, or any employee email hired in the Finance system.");
+      setErrorMsg("Invalid credentials. Try Rajesh's email, or the owner email with correct password.");
     } else {
       setErrorMsg(null);
       router.push("/");
@@ -78,7 +78,9 @@ export default function LoginPage() {
           <div className="space-y-3">
             <h3 className="text-xxs font-bold text-slate-400 uppercase tracking-wider">Quick Connect Cards</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {MOCK_STAFF_DIRECTORY.map((profile) => (
+              {MOCK_STAFF_DIRECTORY
+                .filter((profile) => profile.role !== "SAAS_OWNER")
+                .map((profile) => (
                 <button
                   key={profile.email}
                   onClick={() => handleQuickLogin(profile.email)}
