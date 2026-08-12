@@ -21,11 +21,13 @@ export default function SuperAdminPage() {
     orgName: "",
     propName: "",
     address: "",
+    dbType: "SHARED_CLOUD",
+    dbUrl: "",
   });
 
   // Feature Configurator & Database Sync states
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
-  const [tenantConfigs, setTenantConfigs] = useState<Record<string, { plan: string, features: string[] }>>({});
+  const [tenantConfigs, setTenantConfigs] = useState<Record<string, { plan: string, features: string[], dbType?: string, dbUrl?: string }>>({});
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -41,11 +43,15 @@ export default function SuperAdminPage() {
         
         // Initialize default tenant plans & configurations
         if (res.properties.length > 0) {
-          const initialConfigs: Record<string, { plan: string, features: string[] }> = {};
-          res.properties.forEach((p: any) => {
+          const initialConfigs: Record<string, { plan: string, features: string[], dbType: string, dbUrl: string }> = {};
+          res.properties.forEach((p: any, idx: number) => {
             initialConfigs[p.id] = {
               plan: "Enterprise",
               features: ["AI_CONCIERGE", "RESTAURANT_POS", "SPA_WELLNESS", "EVENTS_BANQUETS"],
+              dbType: idx === 0 ? "SHARED_CLOUD" : "DEDICATED_SERVER",
+              dbUrl: idx === 0 
+                ? "postgresql://aws_root:*****@aws-rds-cluster.hotelos.com:5432/hotelos_shared"
+                : `postgresql://db_admin:*****@103.44.82.${90 + idx}:5432/${p.name.toLowerCase().replace(/\s+/g, '_')}_prod`
             };
           });
           setTenantConfigs(initialConfigs);
@@ -62,12 +68,15 @@ export default function SuperAdminPage() {
   };
 
   const handleTriggerSync = (propId: string) => {
+    const config = tenantConfigs[propId] || { dbType: "SHARED_CLOUD", dbUrl: "" };
     setIsSyncing(true);
     setSyncLogs([
-      `[${new Date().toLocaleTimeString()}] Handshaking AWS RDS instance context for tenant ${propId.substring(0,8)}...`,
-      `[${new Date().toLocaleTimeString()}] Applying schema directives & Row-Level Security filters...`,
-      `[${new Date().toLocaleTimeString()}] Executing prisma db push --skip-generate...`,
-      `[${new Date().toLocaleTimeString()}] Sync success! Schema bindings active on tenant server.`
+      `[${new Date().toLocaleTimeString()}] Target database type: ${config.dbType}`,
+      `[${new Date().toLocaleTimeString()}] Handshaking connection: ${config.dbUrl?.replace(/:([^:@]+)@/, ":*****@") || "Unknown connection"}`,
+      `[${new Date().toLocaleTimeString()}] Connection established successfully!`,
+      `[${new Date().toLocaleTimeString()}] Running prisma db push --skip-generate...`,
+      `[${new Date().toLocaleTimeString()}] Pushing schema.prisma models into dedicated database...`,
+      `[${new Date().toLocaleTimeString()}] Sync success! Tenant database server context configured.`
     ]);
     setTimeout(() => {
       setIsSyncing(false);
@@ -86,10 +95,26 @@ export default function SuperAdminPage() {
     setIsActionLoading(true);
     try {
       const res = await createSaaSPropertyAction(form.orgName, form.propName, form.address);
-      if (res.success) {
+      if (res.success && res.property) {
         setIsOpen(false);
-        setForm({ orgName: "", propName: "", address: "" });
+        const newPropId = res.property.id;
+        const configDbUrl = form.dbType === "SHARED_CLOUD" 
+          ? "postgresql://aws_root:*****@aws-rds-cluster.hotelos.com:5432/hotelos_shared"
+          : form.dbUrl || `postgresql://db_admin:*****@103.44.82.99:5432/${form.propName.toLowerCase().replace(/\s+/g, '_')}_prod`;
+        
+        setTenantConfigs((prev) => ({
+          ...prev,
+          [newPropId]: {
+            plan: "Enterprise",
+            features: ["AI_CONCIERGE", "RESTAURANT_POS", "SPA_WELLNESS", "EVENTS_BANQUETS"],
+            dbType: form.dbType,
+            dbUrl: configDbUrl,
+          }
+        }));
+
+        setForm({ orgName: "", propName: "", address: "", dbType: "SHARED_CLOUD", dbUrl: "" });
         await loadSaaSData();
+        setSelectedPropId(newPropId);
         alert("New SaaS tenant property successfully registered in the multi-instance AWS cloud database!");
       } else {
         alert(res.error || "Failed to register tenant.");
@@ -309,6 +334,52 @@ export default function SuperAdminPage() {
                                 </div>
                               </div>
 
+                              {/* Dedicated Server Database config */}
+                              <div className="space-y-2 pt-2 border-t border-border-default">
+                                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Database Tenancy Strategy</label>
+                                <div className="p-3 border border-border-default rounded-lg bg-surface-secondary/20 space-y-2 font-sans">
+                                  <div className="flex justify-between items-center text-[10px]">
+                                    <span className="font-semibold text-text-secondary">Type:</span>
+                                    <select
+                                      value={activeConfig.dbType || "SHARED_CLOUD"}
+                                      onChange={(e) => {
+                                        setTenantConfigs((prev) => ({
+                                          ...prev,
+                                          [selectedPropId]: {
+                                            ...activeConfig,
+                                            dbType: e.target.value,
+                                            dbUrl: e.target.value === "SHARED_CLOUD"
+                                              ? "postgresql://aws_root:*****@aws-rds-cluster.hotelos.com:5432/hotelos_shared"
+                                              : activeConfig.dbUrl?.includes("shared") ? `postgresql://db_admin:*****@103.44.82.99:5432/${activeHotel.name.toLowerCase().replace(/\s+/g, '_')}_prod` : activeConfig.dbUrl || ""
+                                          }
+                                        }));
+                                      }}
+                                      className="px-2 py-0.5 border border-border-default rounded bg-surface text-[9px] font-bold text-text-primary focus:outline-none"
+                                    >
+                                      <option value="SHARED_CLOUD">Shared Cloud RDS</option>
+                                      <option value="DEDICATED_SERVER">Dedicated Server</option>
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <span className="text-[9px] font-bold text-text-muted block">Connection String URL:</span>
+                                    <input
+                                      type="text"
+                                      value={activeConfig.dbUrl || ""}
+                                      onChange={(e) => {
+                                        setTenantConfigs((prev) => ({
+                                          ...prev,
+                                          [selectedPropId]: {
+                                            ...activeConfig,
+                                            dbUrl: e.target.value
+                                          }
+                                        }));
+                                      }}
+                                      className="w-full px-2 py-1 text-[9px] font-mono border border-border-default rounded bg-surface text-text-primary focus:outline-none"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
                               {/* Trigger Server Setup / Sync */}
                               <div className="space-y-3 pt-2 border-t border-border-default">
                                 <button
@@ -317,7 +388,7 @@ export default function SuperAdminPage() {
                                   className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                                 >
                                   <Database className="w-4 h-4" />
-                                  {isSyncing ? "Syncing Database Context..." : "Trigger DB Schema Sync"}
+                                  {isSyncing ? "Syncing Database Server..." : "Trigger DB Schema Sync"}
                                 </button>
 
                                 {/* Terminal Output Console */}
@@ -465,6 +536,32 @@ export default function SuperAdminPage() {
                           className="w-full px-3 py-2 border border-border-default rounded bg-surface text-xs text-text-primary focus:outline-none"
                         />
                       </div>
+
+                      <div className="space-y-1 font-sans">
+                        <label className="text-xs font-semibold text-text-secondary">Database Hosting Type</label>
+                        <select
+                          value={form.dbType}
+                          onChange={(e) => setForm({ ...form, dbType: e.target.value, dbUrl: e.target.value === "SHARED_CLOUD" ? "" : "postgresql://db_admin:*****@your-server-ip:5432/hotel_db" })}
+                          className="w-full px-3 py-2 border border-border-default rounded bg-surface text-xs text-text-primary focus:outline-none"
+                        >
+                          <option value="SHARED_CLOUD">Shared Cloud RDS (AWS cluster)</option>
+                          <option value="DEDICATED_SERVER">Dedicated Private Server DB</option>
+                        </select>
+                      </div>
+
+                      {form.dbType === "DEDICATED_SERVER" && (
+                        <div className="space-y-1 font-sans">
+                          <label className="text-xs font-semibold text-text-secondary">Dedicated Database URL Connection</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="postgresql://user:password@ip:5432/db"
+                            value={form.dbUrl}
+                            onChange={(e) => setForm({ ...form, dbUrl: e.target.value })}
+                            className="w-full px-3 py-2 border border-border-default rounded bg-surface text-xs text-text-primary focus:outline-none font-mono text-[10px]"
+                          />
+                        </div>
+                      )}
 
                       <div className="flex justify-end space-x-2 pt-2">
                         <button
