@@ -5,7 +5,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import HeaderStaffSwitcher from "@/components/layout/HeaderStaffSwitcher";
 import RoleProtected from "@/components/layout/RoleProtected";
 import { getSaaSOverviewAction, createSaaSPropertyAction } from "@/app/actions/saasAdmin";
-import { ShieldCheck, Plus, RefreshCw, Layers, Database, Activity, CheckCircle2, Loader2, Sparkles, Server } from "lucide-react";
+import { ShieldCheck, Plus, RefreshCw, Layers, Database, Activity, CheckCircle2, Loader2, Sparkles, Server, Search } from "lucide-react";
 
 export default function SuperAdminPage() {
   const [properties, setProperties] = useState<any[]>([]);
@@ -26,6 +26,7 @@ export default function SuperAdminPage() {
   });
 
   // Feature Configurator & Database Sync states
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
   const [tenantConfigs, setTenantConfigs] = useState<Record<string, { plan: string, features: string[], dbType?: string, dbUrl?: string }>>({});
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
@@ -194,7 +195,21 @@ export default function SuperAdminPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Left Column: Hotels Registry */}
                     <div className="lg:col-span-2 space-y-4 font-sans">
-                      <h3 className="text-sm font-bold text-text-primary">Multi-Tenant Hotels Registry</h3>
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <h3 className="text-sm font-bold text-text-primary">Multi-Tenant Hotels Registry</h3>
+                        
+                        {/* Search Input Bar */}
+                        <div className="relative w-full sm:w-64">
+                          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-text-muted" />
+                          <input
+                            type="text"
+                            placeholder="Search by hotel name or group..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 border border-border-default rounded bg-surface text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary transition-all"
+                          />
+                        </div>
+                      </div>
                       
                       <div className="bg-surface border border-border-default rounded-lg shadow-small overflow-hidden">
                         <table className="w-full text-left border-collapse text-xs">
@@ -207,7 +222,12 @@ export default function SuperAdminPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border-default">
-                            {properties.map((prop) => {
+                            {properties
+                              .filter((prop) => 
+                                prop.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                prop.organization.name.toLowerCase().includes(searchQuery.toLowerCase())
+                              )
+                              .map((prop) => {
                               const config = tenantConfigs[prop.id] || { plan: "Enterprise" };
                               const isSelected = selectedPropId === prop.id;
                               return (
