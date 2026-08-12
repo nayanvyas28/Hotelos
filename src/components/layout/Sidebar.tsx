@@ -99,7 +99,7 @@ export default function Sidebar({ currentActive }: SidebarProps) {
     "/frontdesk/minibar": ["MD", "GM", "FRONT_DESK", "HOUSEKEEPER"],
     "/reports/finance-audit": ["MD", "CFO"],
     "/reports/test-suite": ["MD", "CFO", "GM"],
-    "/reports/super-admin": ["MD"],
+    "/reports/super-admin": ["SAAS_OWNER"],
     "/reports/notifications": ["MD", "CFO", "GM"],
     "/reports/finance": ["MD", "CFO"],
     "/profile": ["MD", "CFO", "GM", "FRONT_DESK", "HOUSEKEEPER", "SPA_THERAPIST"],

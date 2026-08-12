@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-export type StaffRole = "MD" | "CFO" | "GM" | "MANAGER" | "FRONT_DESK" | "HOUSEKEEPER" | "SPA_THERAPIST";
+export type StaffRole = "SAAS_OWNER" | "MD" | "CFO" | "GM" | "MANAGER" | "FRONT_DESK" | "HOUSEKEEPER" | "SPA_THERAPIST";
 
 export interface UserProfile {
   name: string;
@@ -25,6 +25,12 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 // Mock directory of staff profiles matching ENTERPRISE_DESIGN.md
 export const MOCK_STAFF_DIRECTORY: UserProfile[] = [
+  {
+    name: "Nayan Vyas",
+    email: "owner@hotelos.com",
+    role: "SAAS_OWNER",
+    scope: "GLOBAL",
+  },
   {
     name: "Rajesh Mehta",
     email: "director@hotelos.com",
@@ -140,8 +146,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser) return false;
     if (!allowedRoles || allowedRoles.length === 0) return true;
 
-    // MD super admin bypasses all role checks
-    if (currentUser.role === "MD") return true;
+    // SAAS_OWNER & MD super admin bypasses all role checks
+    if (currentUser.role === "SAAS_OWNER" || currentUser.role === "MD") return true;
 
     // Map high-privilege roles to check targets
     const checkRoles = [...allowedRoles];

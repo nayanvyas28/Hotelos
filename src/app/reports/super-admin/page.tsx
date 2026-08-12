@@ -112,7 +112,7 @@ export default function SuperAdminPage() {
         </header>
 
         <main className="flex-1 p-6 space-y-6 overflow-y-auto">
-          <RoleProtected allowedRoles={["MD"]}>
+          <RoleProtected allowedRoles={["SAAS_OWNER"]}>
             <>
               {/* Header Info */}
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
