@@ -206,8 +206,8 @@ function CorporateDashboard({ groupStats, stats }: { groupStats: any; stats: any
             <span className="p-2 rounded bg-warning/10 text-warning"><MapPin className="w-5 h-5" /></span>
           </div>
           <div>
-            <div className="text-2xl font-black text-text-primary">{groupStats.propertySummaries.length} hotels</div>
-            <p className="text-xxs text-text-secondary mt-1">Operating in Asia/Kolkata timezone</p>
+            <div className="text-2xl font-black text-text-primary">{groupStats.propertySummaries.length} Hotels</div>
+            <p className="text-xxs text-text-secondary mt-1">Operating in Asia/Kolkata Timezone</p>
           </div>
         </div>
       </div>
