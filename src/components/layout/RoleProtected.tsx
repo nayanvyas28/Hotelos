@@ -2,7 +2,7 @@
 
 import { useSession, MOCK_STAFF_DIRECTORY, StaffRole } from "@/context/SessionContext";
 import { ShieldAlert, Key, Lock } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 interface RoleProtectedProps {
   allowedRoles: StaffRole[];
@@ -10,8 +10,9 @@ interface RoleProtectedProps {
 }
 
 export default function RoleProtected({ allowedRoles, children }: RoleProtectedProps) {
-  const { currentUser, login, hasPermission } = useSession();
+  const { currentUser, hasPermission } = useSession();
   const pathname = usePathname();
+  const router = useRouter();
 
   if (!hasPermission(allowedRoles)) {
     // Beautiful premium Access Denied page
@@ -33,26 +34,13 @@ export default function RoleProtected({ allowedRoles, children }: RoleProtectedP
           </p>
         </div>
 
-        {/* Quick Swapper to make testing easy */}
-        <div className="bg-surface border border-border-default rounded-lg p-5 max-w-sm w-full shadow-small space-y-3.5">
-          <div className="flex items-center space-x-2 text-xxs font-bold text-text-secondary uppercase tracking-wider justify-center border-b border-border-default pb-2">
-            <Key className="w-4 h-4 text-primary" />
-            <span>Switch Profile (Developer Sandbox)</span>
-          </div>
-          <select
-            value={currentUser?.email || ""}
-            onChange={(e) => login(e.target.value)}
-            className="w-full px-3 py-2 border border-border-default rounded bg-surface text-xs font-semibold text-text-primary focus:outline-none cursor-pointer"
+        <div className="flex gap-2 w-full max-w-sm">
+          <button
+            onClick={() => router.push("/")}
+            className="flex-1 py-2 px-4 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded shadow transition-all cursor-pointer text-center"
           >
-            {MOCK_STAFF_DIRECTORY.map((profile) => (
-              <option key={profile.email} value={profile.email}>
-                👤 {profile.name} ({profile.role})
-              </option>
-            ))}
-          </select>
-          <p className="text-[10px] text-text-muted">
-            Select a staff profile with permitted role clearance to unlock this screen.
-          </p>
+            Back to Dashboard
+          </button>
         </div>
       </div>
     );

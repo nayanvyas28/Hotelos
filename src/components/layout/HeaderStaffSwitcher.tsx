@@ -8,6 +8,8 @@ export default function HeaderStaffSwitcher() {
 
   const getRoleBadgeStyle = (role: StaffRole) => {
     switch (role) {
+      case "SAAS_OWNER":
+        return "bg-rose-50 border-rose-100 text-rose-700 dark:bg-rose-950/20 dark:text-rose-400";
       case "MD":
         return "bg-indigo-50 border-indigo-100 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-400";
       case "CFO":
@@ -39,17 +41,9 @@ export default function HeaderStaffSwitcher() {
           {currentUser.role}
         </span>
         
-        <select
-          value={currentUser.email}
-          onChange={(e) => login(e.target.value)}
-          className="px-2 py-1 border border-border-default rounded bg-surface text-[10px] font-bold text-text-secondary focus:outline-none cursor-pointer"
-        >
-          {MOCK_STAFF_DIRECTORY.map((profile) => (
-            <option key={profile.email} value={profile.email}>
-              👤 {profile.name} ({profile.role})
-            </option>
-          ))}
-        </select>
+        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center border border-border-default text-text-secondary">
+          <User className="w-3.5 h-3.5" />
+        </div>
       </div>
     </div>
   );
