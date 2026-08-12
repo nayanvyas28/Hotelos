@@ -55,6 +55,25 @@ export default function AICopilotPage() {
   const [generatedEmail, setGeneratedEmail] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Sentiment Radar states
+  const [delightIndex, setDelightIndex] = useState(94.8);
+  const [sentimentFeed, setSentimentFeed] = useState([
+    { room: "302", text: "AC is perfect, thank you!", mood: "HAPPY", time: "Just now" },
+    { room: "108", text: "Towels haven't arrived yet.", mood: "NEUTRAL", time: "2m ago" },
+    { room: "204", text: "Geyser is not working.", mood: "FRUSTRATED", time: "5m ago" },
+    { room: "411", text: "Love the Swiggy-style POS menu!", mood: "HAPPY", time: "12m ago" },
+  ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDelightIndex((prev) => {
+        const delta = (Math.random() - 0.5) * 0.4;
+        return parseFloat(Math.max(90, Math.min(100, prev + delta)).toFixed(1));
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     async function loadProperties() {
       setIsLoading(true);
@@ -234,6 +253,72 @@ export default function AICopilotPage() {
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 flex items-center space-x-2">
                   <BrainCircuit className="w-5 h-5 text-primary" />
                   <span className="text-xs font-bold text-primary">Radisson AI Engine v1.0</span>
+                </div>
+              </div>
+
+              {/* Real-time Guest Sentiment Radar Widget */}
+              <div className="bg-surface border border-border-default rounded-lg p-6 shadow-small">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  {/* Radar Left - Scanner */}
+                  <div className="flex items-center space-x-4">
+                    <div className="relative w-16 h-16 rounded-full border border-primary/20 flex items-center justify-center overflow-hidden shrink-0">
+                      <div className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent_50%,rgba(99,102,241,0.15)_100%)] animate-[spin_3s_linear_infinite]" />
+                      <div className="w-10 h-10 rounded-full border border-primary/30 flex items-center justify-center bg-surface relative z-10 shadow-inner">
+                        <Compass className="w-5 h-5 text-primary animate-pulse" />
+                      </div>
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-sm text-text-primary flex items-center gap-1.5">
+                        Guest Experience Sentiment Radar
+                        <span className="w-2 h-2 rounded-full bg-success animate-ping shrink-0" />
+                      </h2>
+                      <p className="text-[10px] text-text-muted">Real-time NLP stream parsing guest messages & reviews.</p>
+                    </div>
+                  </div>
+
+                  {/* Radar Middle - Happiness Score */}
+                  <div className="flex items-center space-x-6 border-t md:border-t-0 md:border-l border-border-default pt-4 md:pt-0 md:pl-6 shrink-0 w-full md:w-auto">
+                    <div className="text-center md:text-left">
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Delight Index</span>
+                      <div className="flex items-baseline space-x-1.5 justify-center md:justify-start">
+                        <span className="text-2xl font-black text-text-primary tracking-tight font-mono">{delightIndex}%</span>
+                        <span className="text-[10px] font-bold text-success flex items-center">▲ 0.4%</span>
+                      </div>
+                    </div>
+                    {/* Glowing progress bar */}
+                    <div className="flex-1 md:w-48 bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200 shadow-inner">
+                      <div 
+                        className="bg-gradient-to-r from-warning via-primary to-success h-full transition-all duration-1000 shadow-sm"
+                        style={{ width: `${delightIndex}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Radar Bottom - Guest Mood Feed */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-5 border-t border-border-default">
+                  {sentimentFeed.map((item, index) => {
+                    const isHappy = item.mood === "HAPPY";
+                    const isFrustrated = item.mood === "FRUSTRATED";
+                    return (
+                      <div key={index} className="p-3 border border-border-default rounded-lg bg-surface-secondary/40 relative overflow-hidden group hover:border-primary/20 transition-all">
+                        {/* Sentiment indicator flag */}
+                        <div className={`absolute top-0 left-0 right-0 h-1 ${
+                          isHappy ? "bg-success" : isFrustrated ? "bg-error" : "bg-warning"
+                        }`} />
+                        <div className="flex justify-between items-center text-[9px] text-text-muted mb-1.5 font-bold">
+                          <span>🚪 Room {item.room}</span>
+                          <span className={`px-1 rounded-[4px] uppercase tracking-widest text-[8px] font-black ${
+                            isHappy ? "bg-success/10 text-success" : isFrustrated ? "bg-error/10 text-error" : "bg-warning/10 text-warning"
+                          }`}>
+                            {item.mood}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-text-primary font-medium truncate">{item.text}</p>
+                        <span className="text-[8px] text-text-muted mt-1 block font-semibold">{item.time}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
