@@ -445,27 +445,59 @@ export default function SuperAdminPage() {
 
                   {/* SaaS Infrastructure & Keys Manager */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Database & Webhooks logs */}
+                    {/* Global Edge Nodes & MDM Sync Status */}
                     <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
-                      <h3 className="text-xs font-black uppercase text-text-muted tracking-wider flex items-center">
-                        <Server className="w-4 h-4 mr-1 text-primary" /> Cloud Database Instances Health
-                      </h3>
-                      <div className="space-y-3 text-xs leading-normal">
-                        <div className="flex justify-between items-center py-1 border-b border-border-default/50">
-                          <span>AWS RDS Postgres Pool size</span>
-                          <span className="font-mono text-success font-bold">20 active connections</span>
+                      <div className="flex justify-between items-center border-b border-border-default/50 pb-2">
+                        <h3 className="text-xs font-black uppercase text-text-muted tracking-wider flex items-center">
+                          <Server className="w-4 h-4 mr-1 text-primary animate-pulse" /> Global Edge Nodes & MDM Sync
+                        </h3>
+                        <span className="px-2 py-0.5 rounded text-[8px] font-black bg-success/10 text-success border border-success/20 uppercase tracking-wider font-mono">
+                          Edge Active: 1204/1204 Nodes
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3.5 text-xs leading-normal">
+                        {/* Edge Nodes roster */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center text-xxs font-bold text-text-muted uppercase tracking-wider">
+                            <span>Local Property Cache Node</span>
+                            <span>Network Latency / Status</span>
+                          </div>
+                          
+                          <div className="space-y-1.5 font-mono text-[10px] text-text-secondary">
+                            <div className="flex justify-between items-center py-0.5">
+                              <span>{"🏨 Radisson Delhi Node"}</span>
+                              <span className="text-success font-bold">{"14ms latency • CONNECTED"}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-0.5">
+                              <span>{"🏨 Radisson Noida Node"}</span>
+                              <span className="text-success font-bold">{"11ms latency • CONNECTED"}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-0.5">
+                              <span>{"🏨 Radisson London Node"}</span>
+                              <span className="text-warning font-bold">{"OFFLINE • EDGE CACHING (14 tx cached)"}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-0.5">
+                              <span>{"🏨 Radisson Tokyo Node"}</span>
+                              <span className="text-success font-bold">{"22ms latency • CONNECTED"}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between items-center py-1 border-b border-border-default/50">
-                          <span>Redis Cache Memory Pool</span>
-                          <span className="font-mono text-text-primary">124 MB / 1024 MB</span>
-                        </div>
-                        <div className="flex justify-between items-center py-1 border-b border-border-default/50">
-                          <span>Database CPU utilization</span>
-                          <span className="font-mono text-success font-bold">12.4% CPU</span>
-                        </div>
-                        <div className="flex justify-between items-center py-1">
-                          <span>Tenant Isolation Policy</span>
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-success/15 text-success uppercase">Active (Row-Level Security)</span>
+
+                        {/* Reltio MDM Segment */}
+                        <div className="p-2.5 bg-slate-900 border border-slate-800 rounded font-mono text-[9px] text-slate-400 space-y-1">
+                          <div className="text-xxs font-black text-indigo-400 uppercase tracking-widest border-b border-slate-800 pb-1">
+                            Reltio MDM De-duplication Ledger
+                          </div>
+                          <div className="text-success font-bold">
+                            {"[19:50:02] MDM duplicate matched: Rahul S. (Delhi) <-> Rahul Sharma (Noida)"}
+                          </div>
+                          <div>
+                            {"[19:50:03] Consolidated profiles into global ID: relt_908f-22a1"}
+                          </div>
+                          <div className="text-slate-500">
+                            {"[19:50:04] Locked preferences: [Soft pillows, Black Coffee, High Floor]"}
+                          </div>
                         </div>
                       </div>
                     </div>
