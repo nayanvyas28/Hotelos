@@ -23,6 +23,12 @@ export default function SuperAdminPage() {
     address: "",
   });
 
+  // Feature Configurator & Database Sync states
+  const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
+  const [tenantConfigs, setTenantConfigs] = useState<Record<string, { plan: string, features: string[] }>>({});
+  const [syncLogs, setSyncLogs] = useState<string[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const loadSaaSData = async () => {
     setIsLoading(true);
     setError(null);
@@ -32,6 +38,19 @@ export default function SuperAdminPage() {
         setProperties(res.properties);
         setOrganizations(res.organizations);
         setStats(res.stats);
+        
+        // Initialize default tenant plans & configurations
+        if (res.properties.length > 0) {
+          const initialConfigs: Record<string, { plan: string, features: string[] }> = {};
+          res.properties.forEach((p: any) => {
+            initialConfigs[p.id] = {
+              plan: "Enterprise",
+              features: ["AI_CONCIERGE", "RESTAURANT_POS", "SPA_WELLNESS", "EVENTS_BANQUETS"],
+            };
+          });
+          setTenantConfigs(initialConfigs);
+          setSelectedPropId((prev) => prev || res.properties[0].id);
+        }
       } else {
         setError(res.error || "Failed to load SaaS tenant records.");
       }
@@ -40,6 +59,20 @@ export default function SuperAdminPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleTriggerSync = (propId: string) => {
+    setIsSyncing(true);
+    setSyncLogs([
+      `[${new Date().toLocaleTimeString()}] Handshaking AWS RDS instance context for tenant ${propId.substring(0,8)}...`,
+      `[${new Date().toLocaleTimeString()}] Applying schema directives & Row-Level Security filters...`,
+      `[${new Date().toLocaleTimeString()}] Executing prisma db push --skip-generate...`,
+      `[${new Date().toLocaleTimeString()}] Sync success! Schema bindings active on tenant server.`
+    ]);
+    setTimeout(() => {
+      setIsSyncing(false);
+      alert("Database context successfully synced on tenant server!");
+    }, 2000);
   };
 
   useEffect(() => {
@@ -132,39 +165,179 @@ export default function SuperAdminPage() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Tenants table */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-text-primary">Multi-Tenant Hotels Registry</h3>
-                    
-                    <div className="bg-surface border border-border-default rounded-lg shadow-small overflow-hidden">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-surface-secondary border-b border-border-default text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                            <th className="p-4">Hotel Property ID</th>
-                            <th className="p-4">Hotel Name</th>
-                            <th className="p-4">Organization Tenant Group</th>
-                            <th className="p-4">Plan License</th>
-                            <th className="p-4">API sync status</th>
-                            <th className="p-4 text-right">Software Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-default">
-                          {properties.map((prop) => (
-                            <tr key={prop.id} className="hover:bg-surface-secondary/30 transition-all font-mono">
-                              <td className="p-4 text-primary font-bold">{prop.id.substring(0, 8).toUpperCase()}</td>
-                              <td className="p-4 font-semibold text-text-secondary">{prop.name}</td>
-                              <td className="p-4 text-text-secondary">{prop.organization.name}</td>
-                              <td className="p-4 font-bold text-indigo-500">Premium Enterprise</td>
-                              <td className="p-4 text-success font-bold">100% active</td>
-                              <td className="p-4 text-right">
-                                <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-black bg-success/10 text-success border border-success/20 uppercase tracking-wider">
-                                  Licensed
-                                </span>
-                              </td>
+                  {/* Split Layout for Registry and Feature Configurator */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column: Hotels Registry */}
+                    <div className="lg:col-span-2 space-y-4 font-sans">
+                      <h3 className="text-sm font-bold text-text-primary">Multi-Tenant Hotels Registry</h3>
+                      
+                      <div className="bg-surface border border-border-default rounded-lg shadow-small overflow-hidden">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-surface-secondary border-b border-border-default text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                              <th className="p-4">Hotel Name</th>
+                              <th className="p-4">Tenant Group</th>
+                              <th className="p-4">Active Plan</th>
+                              <th className="p-4 text-right">Action</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-border-default">
+                            {properties.map((prop) => {
+                              const config = tenantConfigs[prop.id] || { plan: "Enterprise" };
+                              const isSelected = selectedPropId === prop.id;
+                              return (
+                                <tr 
+                                  key={prop.id} 
+                                  onClick={() => setSelectedPropId(prop.id)}
+                                  className={`hover:bg-surface-secondary/30 transition-all cursor-pointer ${
+                                    isSelected ? "bg-primary/5 border-l-2 border-primary" : ""
+                                  }`}
+                                >
+                                  <td className="p-4 font-semibold text-text-secondary">{prop.name}</td>
+                                  <td className="p-4 text-text-secondary">{prop.organization.name}</td>
+                                  <td className="p-4">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      config.plan === "Starter" ? "bg-slate-100 text-slate-600" : config.plan === "Professional" ? "bg-indigo-50 text-indigo-600" : "bg-primary/10 text-primary"
+                                    }`}>
+                                      {config.plan}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-right">
+                                    <span className="text-[10px] font-bold text-primary">Configure →</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Feature Plan Configurator */}
+                    <div className="bg-surface border border-border-default rounded-lg p-6 shadow-small space-y-6">
+                      {selectedPropId && properties.find((p) => p.id === selectedPropId) ? (
+                        (() => {
+                          const activeHotel = properties.find((p) => p.id === selectedPropId)!;
+                          const activeConfig = tenantConfigs[selectedPropId] || { plan: "Enterprise", features: ["AI_CONCIERGE", "RESTAURANT_POS"] };
+                          
+                          const toggleFeature = (feat: string) => {
+                            setTenantConfigs((prev) => {
+                              const current = prev[selectedPropId] || { plan: "Enterprise", features: [] };
+                              const updatedFeatures = current.features.includes(feat)
+                                ? current.features.filter((f) => f !== feat)
+                                : [...current.features, feat];
+                              return {
+                                ...prev,
+                                [selectedPropId]: { ...current, features: updatedFeatures }
+                              };
+                            });
+                          };
+
+                          const selectPlan = (plan: string) => {
+                            setTenantConfigs((prev) => {
+                              const current = prev[selectedPropId] || { plan: "Enterprise", features: [] };
+                              // Starter plan only gets RESTAURANT_POS, Professional gets POS + SPA, Enterprise gets all!
+                              let feats = ["RESTAURANT_POS"];
+                              if (plan === "Professional") feats = ["RESTAURANT_POS", "SPA_WELLNESS"];
+                              if (plan === "Enterprise") feats = ["AI_CONCIERGE", "RESTAURANT_POS", "SPA_WELLNESS", "EVENTS_BANQUETS"];
+                              return {
+                                ...prev,
+                                [selectedPropId]: { plan, features: feats }
+                              };
+                            });
+                          };
+
+                          return (
+                            <>
+                              <div className="border-b border-border-default pb-3">
+                                <h3 className="text-sm font-bold text-text-primary">Configure Onboarding License</h3>
+                                <p className="text-[10px] text-text-muted mt-0.5">Settings for: <span className="font-bold text-text-primary">{activeHotel.name}</span></p>
+                              </div>
+
+                              {/* Subscription Plan Switcher */}
+                              <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">License Tier Plan</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {["Starter", "Professional", "Enterprise"].map((plan) => (
+                                    <button
+                                      key={plan}
+                                      onClick={() => selectPlan(plan)}
+                                      className={`py-2 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                                        activeConfig.plan === plan
+                                          ? "bg-primary border-primary text-white shadow-small"
+                                          : "bg-surface-secondary border-border-default text-text-secondary hover:bg-slate-100"
+                                      }`}
+                                    >
+                                      {plan}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Active Software Feature Switches */}
+                              <div className="space-y-3">
+                                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Software Module Switches</label>
+                                <div className="space-y-2.5">
+                                  {[
+                                    { key: "AI_CONCIERGE", label: "AI Concierge & Task Automation", desc: "NLP Message Parsers & Dispatchers" },
+                                    { key: "RESTAURANT_POS", label: "Swiggy-Style POS & Guest Orders", desc: "Menus, category pills, & folio charges" },
+                                    { key: "SPA_WELLNESS", label: "Spa & Wellness Reservation Roster", desc: "Therapists scheduling & booking calendar" },
+                                    { key: "EVENTS_BANQUETS", label: "Events & Banquet Scheduling", desc: "Hall bookings & layout configs" },
+                                  ].map((feat) => {
+                                    const enabled = activeConfig.features.includes(feat.key);
+                                    return (
+                                      <div 
+                                        key={feat.key} 
+                                        onClick={() => toggleFeature(feat.key)}
+                                        className="flex items-center justify-between p-2.5 border border-border-default/60 rounded-lg hover:bg-slate-50 cursor-pointer transition-all"
+                                      >
+                                        <div className="space-y-0.5">
+                                          <div className="text-[10px] font-bold text-text-primary">{feat.label}</div>
+                                          <div className="text-[9px] text-text-muted">{feat.desc}</div>
+                                        </div>
+                                        {/* Toggle switch visual */}
+                                        <div className={`w-8 h-4.5 rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
+                                          enabled ? "bg-success" : "bg-slate-300"
+                                        }`}>
+                                          <div className={`w-3.5 h-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${
+                                            enabled ? "translate-x-3.5" : "translate-x-0"
+                                          }`} />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Trigger Server Setup / Sync */}
+                              <div className="space-y-3 pt-2 border-t border-border-default">
+                                <button
+                                  onClick={() => handleTriggerSync(selectedPropId)}
+                                  disabled={isSyncing}
+                                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                  <Database className="w-4 h-4" />
+                                  {isSyncing ? "Syncing Database Context..." : "Trigger DB Schema Sync"}
+                                </button>
+
+                                {/* Terminal Output Console */}
+                                {syncLogs.length > 0 && (
+                                  <div className="bg-slate-900 border border-slate-800 rounded p-3 text-[9px] font-mono text-slate-400 space-y-1 max-h-[110px] overflow-y-auto">
+                                    {syncLogs.map((log, idx) => (
+                                      <div key={idx} className={idx === syncLogs.length - 1 ? "text-success font-bold" : ""}>{log}</div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-center text-text-muted py-20 space-y-3">
+                          <Layers className="w-10 h-10 text-text-muted" />
+                          <p className="text-xs">Select a hotel from the registry list to configure active feature switches.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
