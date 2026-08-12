@@ -42,7 +42,7 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     try {
-      if (currentUser?.role === "MD" || currentUser?.role === "CFO") {
+      if (currentUser?.role === "MD" || currentUser?.role === "CFO" || currentUser?.role === "SAAS_OWNER") {
         const res = await getGroupDashboardStatsAction();
         if (res.success) {
           setGroupStats(res.groupStats);
@@ -129,7 +129,7 @@ export default function Home() {
             </div>
 
             {/* Render Dashboard based on Role */}
-            {(currentUser.role === "MD" || currentUser.role === "CFO") && groupStats && (
+            {(currentUser.role === "MD" || currentUser.role === "CFO" || currentUser.role === "SAAS_OWNER") && groupStats && (
               <CorporateDashboard groupStats={groupStats} stats={stats} />
             )}
 
