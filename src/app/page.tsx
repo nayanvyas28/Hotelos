@@ -26,8 +26,12 @@ import {
   Loader2,
   AlertTriangle,
   FileText,
+  Server,
+  Shield,
+  Activity,
 } from "lucide-react";
 import Link from "next/link";
+import { getSaaSOverviewAction } from "@/app/actions/saasAdmin";
 
 export default function Home() {
   const { currentUser, activePropertyId } = useSession();
@@ -36,13 +40,21 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<any | null>(null);
   const [groupStats, setGroupStats] = useState<any | null>(null);
+  const [saasData, setSaasData] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      if (currentUser?.role === "MD" || currentUser?.role === "CFO" || currentUser?.role === "SAAS_OWNER") {
+      if (currentUser?.role === "SAAS_OWNER") {
+        const resSaas = await getSaaSOverviewAction();
+        if (resSaas.success) {
+          setSaasData(resSaas);
+        } else {
+          setError(resSaas.error || "Failed to load SaaS platform metrics.");
+        }
+      } else if (currentUser?.role === "MD" || currentUser?.role === "CFO") {
         const res = await getGroupDashboardStatsAction();
         if (res.success) {
           setGroupStats(res.groupStats);
@@ -52,11 +64,13 @@ export default function Home() {
       }
       
       // Load individual property stats for GM, Front Desk, Housekeeper, Spa, or active MD location view
-      const resProp = await getDashboardStatsAction(activePropertyId);
-      if (resProp.success) {
-        setStats(resProp.stats);
-      } else {
-        setError(resProp.error || "Failed to load location metrics.");
+      if (currentUser?.role !== "SAAS_OWNER") {
+        const resProp = await getDashboardStatsAction(activePropertyId);
+        if (resProp.success) {
+          setStats(resProp.stats);
+        } else {
+          setError(resProp.error || "Failed to load location metrics.");
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to fetch metrics.");
@@ -122,14 +136,20 @@ export default function Home() {
                 Welcome back, {currentUser.name}!
               </h1>
               <p className="text-xs text-text-secondary mt-1">
-                {currentUser.role === "MD" || currentUser.role === "CFO"
+                {currentUser.role === "SAAS_OWNER"
+                  ? "SaaS Developer Workspace & Multi-Tenant Control Hub."
+                  : currentUser.role === "MD" || currentUser.role === "CFO"
                   ? "Corporate Enterprise Overview & Multi-Property Performance Index."
                   : `Managing operations at Radisson Palace location.`}
               </p>
             </div>
 
             {/* Render Dashboard based on Role */}
-            {(currentUser.role === "MD" || currentUser.role === "CFO" || currentUser.role === "SAAS_OWNER") && groupStats && (
+            {currentUser.role === "SAAS_OWNER" && saasData && (
+              <SaaSDeveloperDashboard saasData={saasData} />
+            )}
+
+            {(currentUser.role === "MD" || currentUser.role === "CFO") && groupStats && (
               <CorporateDashboard groupStats={groupStats} stats={stats} />
             )}
 
@@ -525,6 +545,84 @@ function SpaDashboard({ stats }: { stats: any }) {
           <p className="text-xs text-text-secondary">View hourly appointments, record therapist details, and charge treatments directly to room folio.</p>
         </div>
         <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-primary transition-all" />
+      </Link>
+    </div>
+  );
+}
+
+// ----------------------------------------------------
+// 6. SaaS Developer / Platform Owner Dashboard View (SAAS_OWNER)
+// ----------------------------------------------------
+function SaaSDeveloperDashboard({ saasData }: { saasData: any }) {
+  const { stats, properties, organizations } = saasData;
+
+  return (
+    <div className="space-y-6">
+      {/* 4 Premium SaaS Metrics Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-sans">
+        {/* Total Client Organizations */}
+        <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xxs font-bold text-text-muted uppercase tracking-wider">Client Tenant Groups</span>
+            <span className="p-2 rounded bg-indigo-500/10 text-indigo-500"><Users className="w-5 h-5" /></span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-text-primary">{organizations?.length || 0} Organizations</div>
+            <p className="text-xxs text-text-secondary mt-1">Hired multi-tenant software groups</p>
+          </div>
+        </div>
+
+        {/* Live Hotel Licenses */}
+        <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xxs font-bold text-text-muted uppercase tracking-wider">Active Hotel Instances</span>
+            <span className="p-2 rounded bg-primary-light text-primary"><Hotel className="w-5 h-5" /></span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-text-primary">{properties?.length || 0} Locations</div>
+            <p className="text-xxs text-text-secondary mt-1">Live active property instances</p>
+          </div>
+        </div>
+
+        {/* Monthly Recurring Revenue (MRR) */}
+        <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xxs font-bold text-text-muted uppercase tracking-wider">Monthly Recurring Revenue</span>
+            <span className="p-2 rounded bg-success/10 text-success"><DollarSign className="w-5 h-5" /></span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-text-primary">USD {stats?.mrr || 0}</div>
+            <p className="text-xxs text-text-secondary mt-1 flex items-center text-success">
+              <TrendingUp className="w-3 h-3 mr-1" /> Churn rate: {stats?.churnRate || "0%"}
+            </p>
+          </div>
+        </div>
+
+        {/* API Gateway Status */}
+        <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xxs font-bold text-text-muted uppercase tracking-wider">API Gateway Health</span>
+            <span className="p-2 rounded bg-rose-500/10 text-rose-500"><Activity className="w-5 h-5" /></span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-text-primary">{stats?.apiLoad || "100%"}</div>
+            <p className="text-xxs text-text-secondary mt-1">Uptime SLA limit</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Redirect Link to SaaS Control Tower */}
+      <Link
+        href="/reports/super-admin"
+        className="bg-indigo-600/5 border border-indigo-500/20 hover:border-indigo-500 p-6 rounded-lg shadow-small flex items-center justify-between group transition-all"
+      >
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-indigo-900 group-hover:text-indigo-600 transition-all font-sans">
+            Open SaaS Control Tower Settings
+          </h3>
+          <p className="text-xs text-text-secondary">Provision new tenant hotels, toggle software modules, input custom database connection URLs, and check global MDM sync logs.</p>
+        </div>
+        <ArrowRight className="w-5 h-5 text-indigo-500 group-hover:translate-x-1 transition-all" />
       </Link>
     </div>
   );
