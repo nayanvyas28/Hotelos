@@ -44,3 +44,9 @@ next-env.d.ts
 
 # local credentials
 staff_credentials.md
+
+# IDE & agent artifacts
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
