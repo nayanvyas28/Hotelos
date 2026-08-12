@@ -31,7 +31,7 @@ export default function HeaderStaffSwitcher() {
     <div className="flex items-center space-x-3 bg-surface border border-border-default rounded-lg px-3 py-1.5 shadow-xxs">
       <div className="hidden md:block text-right">
         <div className="text-xxs font-bold text-text-primary leading-none">{currentUser.name}</div>
-        <div className="text-[9px] text-text-muted mt-0.5">{currentUser.email}</div>
+        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{currentUser.email}</div>
       </div>
 
       <div className="h-8 w-px bg-border-default hidden md:block" />
