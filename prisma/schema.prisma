@@ -1,0 +1,587 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. Tenant Models
+model Organization {
+  id          String     @id @default(uuid())
+  name        String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  properties  Property[]
+  users       User[]
+}
+
+model Property {
+  id             String       @id @default(uuid())
+  name           String
+  address        String?
+  currency       String       @default("INR")
+  timezone       String       @default("Asia/Kolkata")
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  floors         Floor[]
+  rooms          Room[]
+  guests         Guest[]
+  reservations   Reservation[]
+  expenses       Expense[]
+  menuItems        MenuItem[]
+  restaurantTables RestaurantTable[]
+  restaurantOrders RestaurantOrder[]
+  suppliers      Supplier[]
+  inventoryItems InventoryItem[]
+  banquetHalls   BanquetHall[]
+  eventBookings  EventBooking[]
+  spaServices    SpaService[]
+  therapists     Therapist[]
+  spaBookings    SpaBooking[]
+  businessDate   DateTime        @default(now())
+  nightAuditLogs NightAuditLog[]
+  ratePlans      RatePlan[]
+  seasons        Season[]
+  companies      Company[]
+  shifts         Shift[]
+  auditLogs      AuditLog[]
+  webhooks       WebhookSubscription[]
+  apiKeys        ApiKey[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+// 2. User & RBAC Models
+model User {
+  id             String        @id @default(uuid()) // Can map to Supabase auth user ID
+  email          String        @unique
+  firstName      String?
+  lastName       String?
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  userRoles      UserRole[]
+  shifts         Shift[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Role {
+  id              String           @id @default(uuid())
+  name            String           @unique // e.g. SUPER_ADMIN, OWNER, FRONT_DESK
+  description     String?
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Permission {
+  id              String           @id @default(uuid())
+  name            String           @unique // e.g. reservation.create, guest.view
+  description     String?
+  rolePermissions RolePermission[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+// 3. Property Setup Foundations (for Phase 2)
+model Floor {
+  id         String   @id @default(uuid())
+  number     Int
+  name       String?
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  rooms      Room[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model RoomType {
+  id          String   @id @default(uuid())
+  name        String
+  code        String
+  description String?
+  capacity    Int
+  beds        Int
+  basePrice   Float
+  propertyId  String
+  rooms       Room[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Room {
+  id         String   @id @default(uuid())
+  number     String
+  status     String   @default("AVAILABLE") // AVAILABLE, OCCUPIED, DIRTY, etc.
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  floorId    String
+  floor      Floor    @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+  housekeepingTasks HousekeepingTask[]
+  maintenanceLogs   MaintenanceLog[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// 4. Guest CRM Models (Phase 3)
+model Guest {
+  id             String          @id @default(uuid())
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  nationality    String?
+  dateOfBirth    DateTime?
+  vipStatus      Boolean         @default(false)
+  propertyId     String
+  property       Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  addresses      GuestAddress[]
+  documents      GuestDocument[]
+  notes          GuestNote[]
+  reservations   Reservation[]
+  eventBookings  EventBooking[]
+  spaBookings    SpaBooking[]
+  companyId      String?
+  company        Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([propertyId, email])
+  @@unique([propertyId, phone])
+}
+
+model GuestDocument {
+  id             String   @id @default(uuid())
+  type           String   // e.g. PASSPORT, DRIVING_LICENSE, NATIONAL_ID
+  documentNumber String
+  fileKey        String?  // Storage key reference
+  guestId        String
+  guest          Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model GuestAddress {
+  id           String   @id @default(uuid())
+  addressLine1 String
+  city         String
+  state        String
+  country      String
+  postalCode   String
+  guestId      String
+  guest        Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model GuestNote {
+  id          String   @id @default(uuid())
+  text        String
+  guestId     String
+  guest       Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  createdById String?  // User ID who created the note
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Reservation {
+  id             String            @id @default(uuid())
+  checkIn        DateTime
+  checkOut       DateTime
+  status         String            @default("CONFIRMED") // PENDING, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED, NO_SHOW
+  source         String            @default("DIRECT")    // DIRECT, WALK_IN, WEBSITE, OTA, etc.
+  totalPrice     Float
+  depositPaid    Float             @default(0)
+  notes          String?
+  roomId         String
+  room           Room              @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  propertyId     String
+  property       Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guests         Guest[]
+  folio          Folio?
+  restaurantOrders RestaurantOrder[]
+  ratePlanId     String?
+  ratePlan       RatePlan?         @relation(fields: [ratePlanId], references: [id], onDelete: SetNull)
+  companyId      String?
+  company        Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  billingType    String            @default("GUEST_PAY") // GUEST_PAY, COMPANY_PAY
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model Folio {
+  id             String            @id @default(uuid())
+  reservationId  String            @unique
+  reservation    Reservation       @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  status         String            @default("OPEN") // OPEN, CLOSED
+  charges        FolioCharge[]
+  payments       FolioPayment[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model FolioCharge {
+  id          String   @id @default(uuid())
+  folioId     String
+  folio       Folio    @relation(fields: [folioId], references: [id], onDelete: Cascade)
+  type        String   // ROOM_RATE, TAX, ROOM_SERVICE, RESTAURANT, SPA, OTHER
+  amount      Float
+  taxAmount   Float    @default(0)
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FolioPayment {
+  id        String   @id @default(uuid())
+  folioId   String
+  folio     Folio    @relation(fields: [folioId], references: [id], onDelete: Cascade)
+  amount    Float
+  type      String   @default("PAYMENT") // PAYMENT, REFUND
+  method    String   // CASH, CARD, UPI, BANK_TRANSFER
+  reference String?  // Transaction ref / Auth code
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model HousekeepingTask {
+  id           String    @id @default(uuid())
+  roomId       String
+  room         Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  assignedTo   String?   // Name of assigned staff
+  status       String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  priority     String    @default("MEDIUM") // LOW, MEDIUM, HIGH, RUSH
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model MaintenanceLog {
+  id             String    @id @default(uuid())
+  roomId         String
+  room         Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  issue          String
+  priority       String    @default("MEDIUM") // LOW, MEDIUM, HIGH
+  status         String    @default("REPORTED") // REPORTED, IN_PROGRESS, RESOLVED
+  isOutOfService Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amount      Float
+  category    String   // e.g. SALARIES, UTILITIES, MAINTENANCE, INVENTORY, OTHER
+  description String
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MenuItem {
+  id          String   @id @default(uuid())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  price       Float
+  category    String   // APPETIZER, MAIN_COURSE, DESSERT, BEVERAGE
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orderItems  RestaurantOrderItem[]
+}
+
+model RestaurantTable {
+  id         String   @id @default(uuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  number     String
+  capacity   Int
+  status     String   @default("AVAILABLE") // AVAILABLE, OCCUPIED, RESERVED
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orders     RestaurantOrder[]
+}
+
+model RestaurantOrder {
+  id            String    @id @default(uuid())
+  propertyId    String
+  property      Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tableId       String?
+  table         RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  reservationId String?
+  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  status        String    @default("PENDING") // PENDING, KITCHEN, SERVED, PAID, CANCELLED
+  paymentStatus String    @default("UNPAID") // UNPAID, PAID, ROOM_CHARGE
+  totalAmount   Float
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  orderItems    RestaurantOrderItem[]
+}
+
+model RestaurantOrderItem {
+  id         String    @id @default(uuid())
+  orderId    String
+  order      RestaurantOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  quantity   Int
+  unitPrice  Float
+}
+
+model Supplier {
+  id             String             @id @default(uuid())
+  propertyId     String
+  property       Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name           String
+  contactName    String?
+  email          String?
+  phone          String?
+  address        String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  transactions   StockTransaction[]
+}
+
+model InventoryItem {
+  id           String             @id @default(uuid())
+  propertyId   String
+  property     Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name         String
+  sku          String?
+  category     String             // HOUSEKEEPING, TOILETRIES, RESTAURANT_RAW, OFFICE_SUPPLIES
+  quantity     Int                @default(0)
+  minQuantity  Int                @default(5) // Threshold for warnings
+  unitCost     Float              @default(0)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  transactions StockTransaction[]
+}
+
+model StockTransaction {
+  id              String        @id @default(uuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  type            String        // PURCHASE, USAGE, ADJUSTMENT
+  quantity        Int           // Positive for purchase, negative for usage
+  supplierId      String?
+  supplier        Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  cost            Float?
+  notes           String?
+  createdAt       DateTime      @default(now())
+}
+
+model BanquetHall {
+  id            String         @id @default(uuid())
+  propertyId    String
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name          String
+  capacity      Int
+  basePrice     Float
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  bookings      EventBooking[]
+}
+
+model EventBooking {
+  id               String       @id @default(uuid())
+  propertyId       String
+  property         Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  hallId           String
+  hall             BanquetHall  @relation(fields: [hallId], references: [id], onDelete: Cascade)
+  guestId          String?      // Optional relation to Guest CRM
+  guest            Guest?       @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  contactName      String
+  contactPhone     String
+  contactEmail     String
+  eventName        String
+  startDateTime    DateTime
+  endDateTime      DateTime
+  status           String       @default("CONFIRMED") // CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED
+  paymentStatus    String       @default("UNPAID")    // UNPAID, PAID, ROOM_CHARGE
+  paxCount         Int
+  cateringDetails  String?
+  equipmentDetails String?
+  totalAmount      Float
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model SpaService {
+  id          String       @id @default(uuid())
+  propertyId  String
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name        String
+  duration    Int          // In minutes
+  price       Float
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  bookings    SpaBooking[]
+}
+
+model Therapist {
+  id             String       @id @default(uuid())
+  propertyId     String
+  property       Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name           String
+  specialization String?
+  isAvailable    Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  bookings       SpaBooking[]
+}
+
+model SpaBooking {
+  id              String      @id @default(uuid())
+  propertyId      String
+  property        Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         SpaService  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  therapistId     String
+  therapist       Therapist   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  guestId         String?     // Optional relation to Guest CRM
+  guest           Guest?      @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  contactName     String
+  contactPhone    String
+  bookingDateTime DateTime
+  status          String      @default("CONFIRMED") // CONFIRMED, COMPLETED, CANCELLED
+  paymentStatus   String      @default("UNPAID")    // UNPAID, PAID, ROOM_CHARGE
+  totalAmount     Float
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model NightAuditLog {
+  id               String   @id @default(uuid())
+  propertyId       String
+  property         Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  auditDate        DateTime // The business date that was audited/rolled
+  rolledToDate     DateTime // The new business date
+  totalRoomCharges Float    // Total room rate charges posted during this audit
+  totalTaxPosted   Float    // Total tax posted during this audit
+  totalRevenue     Float    // Total payments settled on this business date (room checkout + spa checkout + rest checkout)
+  totalExpenses    Float    // Total expenses logged on this business date
+  noShowsProcessed Int      // Number of no-show bookings processed
+  performedBy      String   // E.g. user email or staff name
+  createdAt        DateTime @default(now())
+}
+
+model RatePlan {
+  id            String        @id @default(uuid())
+  propertyId    String
+  property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name          String
+  code          String        // e.g. RACK, NON_REF, BB
+  modifierType  String        // PERCENTAGE, FIXED
+  modifierValue Float
+  isActive      Boolean       @default(true)
+  reservations  Reservation[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Season {
+  id            String   @id @default(uuid())
+  propertyId    String
+  property      Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name          String
+  startDate     DateTime
+  endDate       DateTime
+  modifierType  String   // PERCENTAGE, FIXED
+  modifierValue Float
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Company {
+  id              String        @id @default(uuid())
+  propertyId      String
+  property        Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name            String
+  taxId           String?       // Corporate Tax ID / GSTIN
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  discountPercent Float         @default(0) // Default corporate stay discount percent (e.g. 15%)
+  guests          Guest[]
+  reservations    Reservation[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Shift {
+  id         String   @id @default(uuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleName   String   // e.g. FRONT_DESK, HOUSEKEEPER
+  startTime  DateTime
+  endTime    DateTime
+  status     String   @default("SCHEDULED") // SCHEDULED, ACTIVE, COMPLETED, CANCELLED
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  action      String   // e.g. RESERVATION_CREATE, GUEST_CHECKIN, PAYMENT_POST
+  details     String   // Description/JSON metadata
+  performedBy String   // User email or auditor name
+  createdAt   DateTime @default(now())
+}
+
+model WebhookSubscription {
+  id         String   @id @default(uuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  targetUrl  String
+  eventTypes String   // e.g. "reservation.create,guest.checkin"
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model ApiKey {
+  id         String   @id @default(uuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name       String   // e.g. "Channel Manager Key"
+  token      String   @unique // Hashed or UUID key token
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}

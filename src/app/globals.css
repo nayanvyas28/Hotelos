@@ -1,26 +1,114 @@
 @import "tailwindcss";
 
+@theme {
+  /* Brand colors */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-accent: var(--accent);
+  
+  /* Semantic colors */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  
+  /* Layout colors */
+  --color-app-bg: var(--app-bg);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-hover: var(--surface-hover);
+  
+  /* Text colors */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  
+  /* Borders */
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+  
+  /* Border radius */
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-xxl: var(--radius-xxl);
+  
+  /* Shadows */
+  --shadow-small: var(--shadow-small);
+  --shadow-medium: var(--shadow-medium);
+  --shadow-modal: var(--shadow-modal);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand */
+  --primary: #2563EB;
+  --primary-hover: #1D4ED8;
+  --primary-light: #EFF6FF;
+  --accent: #8B5CF6;
+  
+  /* Semantic */
+  --success: #16A34A;
+  --warning: #D97706;
+  --error: #DC2626;
+  --info: #0284C7;
+  
+  /* Layout */
+  --app-bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --surface-secondary: #F9FAFB;
+  --surface-hover: #F3F4F6;
+  
+  /* Text */
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #6B7280;
+  
+  /* Borders */
+  --border-default: #E5E7EB;
+  --border-strong: #D1D5DB;
+  
+  /* Border radius */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-xxl: 20px;
+  
+  /* Shadows */
+  --shadow-small: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.15);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  /* Brand */
+  --primary: #60A5FA;
+  --primary-hover: #3B82F6;
+  --primary-light: #1E3A8A;
+  --accent: #A78BFA;
+  
+  /* Layout */
+  --app-bg: #0B0F14;
+  --surface: #111827;
+  --surface-secondary: #172033;
+  --surface-hover: #1F2937;
+  
+  /* Text */
+  --text-primary: #F9FAFB;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  
+  /* Borders */
+  --border-default: #273244;
+  --border-strong: #374151;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--app-bg);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }

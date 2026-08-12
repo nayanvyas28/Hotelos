@@ -1,0 +1,42 @@
+{
+  "handovers": [
+    {
+      "id": "ho_1",
+      "propertyId": "5f31df82-83ca-4b6d-8b07-25ae59eb924b",
+      "businessDate": "2026-08-11",
+      "shift": "Morning to Evening",
+      "cashReconciled": 85000,
+      "outgoingManager": "Priya Nair",
+      "incomingManager": "Vikram Singh",
+      "openIssues": "Room 205 requested late checkout at 02:00 PM. Room 310 AC cooling issue is still pending engineer inspection.",
+      "vipArrivals": "Mr. & Mrs. Sharma (VVIP) arriving at 11:30 AM via private airport transfer.",
+      "createdAt": "2026-08-11T09:00:00Z"
+    }
+  ],
+  "incidents": [
+    {
+      "id": "inc_1",
+      "propertyId": "5f31df82-83ca-4b6d-8b07-25ae59eb924b",
+      "title": "Room 205 AC Cooling Failure",
+      "category": "MAINTENANCE",
+      "priority": "HIGH",
+      "status": "OPEN",
+      "details": "Guest in Room 205 complained that the split AC is blowing warm air. Engineering technician has been dispatched.",
+      "reportedBy": "Priya Nair",
+      "assignedTo": "Chief Engineer",
+      "createdAt": "2026-08-11T10:15:00Z"
+    },
+    {
+      "id": "inc_2",
+      "propertyId": "5f31df82-83ca-4b6d-8b07-25ae59eb924b",
+      "title": "Minor Water Leakage in Room 104 Bath",
+      "category": "MAINTENANCE",
+      "priority": "MEDIUM",
+      "status": "RESOLVED",
+      "details": "Sink faucet was dripping water. Plumbing technician tightened the connection and verified it is fully sealed.",
+      "reportedBy": "Sunil Kumar",
+      "assignedTo": "Plumber technician",
+      "createdAt": "2026-08-11T11:45:00Z"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "app_1",
+    "propertyId": "5f31df82-83ca-4b6d-8b07-25ae59eb924b",
+    "type": "REFUND",
+    "subject": "Folio Refund Above Limit",
+    "details": "Priya Nair (Front Desk) requested a refund of INR 35,000.00 for Reservation #61389d7. Reason: Medical emergency cancellation request.",
+    "amount": 35000,
+    "status": "PENDING",
+    "requestor": "Priya Nair",
+    "createdAt": "2026-08-11T12:00:00Z"
+  },
+  {
+    "id": "app_2",
+    "propertyId": "5f31df82-83ca-4b6d-8b07-25ae59eb924b",
+    "type": "RATE_OVERRIDE",
+    "subject": "Custom Discount Override",
+    "details": "Request to apply 30% discount for Microsoft Group Booking (standard maximum corporate limit is 15%).",
+    "amount": 0,
+    "status": "PENDING",
+    "requestor": "Vikram Singh",
+    "createdAt": "2026-08-11T14:30:00Z"
+  },
+  {
+    "id": "app_3",
+    "propertyId": "5f31df82-83ca-4b6d-8b07-25ae59eb924b",
+    "type": "PURCHASE_ORDER",
+    "subject": "Industrial Laundry Washer PO",
+    "details": "Procurement requested purchase order of INR 1,85,000.00 for HK department equipment upgrade from Siemens vendor.",
+    "amount": 185000,
+    "status": "PENDING",
+    "requestor": "Sunil Kumar",
+    "createdAt": "2026-08-11T15:15:00Z"
+  }
+]
