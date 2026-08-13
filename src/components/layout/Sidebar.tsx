@@ -51,6 +51,16 @@ export default function Sidebar({ currentActive }: SidebarProps) {
   const { hasPermission, currentUser, activePropertyId, setActivePropertyId, logout } = useSession();
   const [properties, setProperties] = useState<any[]>([]);
   const navRef = useRef<HTMLElement>(null);
+  const [showOperations, setShowOperations] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("hotelos_saas_show_operations");
+      if (saved === "true") {
+        setShowOperations(true);
+      }
+    }
+  }, []);
 
   // Restore scroll state on page load
   useEffect(() => {
@@ -183,6 +193,10 @@ export default function Sidebar({ currentActive }: SidebarProps) {
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {
+        // If SaaS Owner is in clean view mode, hide all operational views
+        if (currentUser?.role === "SAAS_OWNER" && !showOperations) {
+          return item.href === "/reports/super-admin" || item.href === "/profile";
+        }
         const allowedRoles = allowedRolesMap[item.href];
         return hasPermission(allowedRoles);
       }),
@@ -203,7 +217,7 @@ export default function Sidebar({ currentActive }: SidebarProps) {
           </div>
         </div>
 
-        {currentUser?.scope === "GLOBAL" && properties.length > 0 && (
+        {currentUser?.scope === "GLOBAL" && properties.length > 0 && (currentUser?.role !== "SAAS_OWNER" || showOperations) && (
           <div className="space-y-1">
             <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Active Location</label>
             <select
@@ -217,6 +231,29 @@ export default function Sidebar({ currentActive }: SidebarProps) {
                 </option>
               ))}
             </select>
+          </div>
+        )}
+
+        {currentUser?.role === "SAAS_OWNER" && (
+          <div className="pt-3 border-t border-border-default flex items-center justify-between">
+            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Property Operations</span>
+            <button
+              type="button"
+              onClick={() => {
+                const newVal = !showOperations;
+                setShowOperations(newVal);
+                localStorage.setItem("hotelos_saas_show_operations", String(newVal));
+              }}
+              className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                showOperations ? "bg-primary" : "bg-slate-300 dark:bg-slate-700"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  showOperations ? "translate-x-3.5" : "translate-x-0"
+                }`}
+              />
+            </button>
           </div>
         )}
       </div>
