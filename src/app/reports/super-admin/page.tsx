@@ -53,6 +53,7 @@ export default function SuperAdminPage() {
   const [propTimezoneInput, setPropTimezoneInput] = useState("Asia/Kolkata");
   const [propCurrencyInput, setPropCurrencyInput] = useState("INR");
   const [propOrgInput, setPropOrgInput] = useState("");
+  const [propGroqKeyInput, setPropGroqKeyInput] = useState("");
 
   useEffect(() => {
     if (selectedPropId && properties.length > 0) {
@@ -63,6 +64,7 @@ export default function SuperAdminPage() {
         setPropTimezoneInput(activeHotel.timezone || "Asia/Kolkata");
         setPropCurrencyInput(activeHotel.currency || "INR");
         setPropOrgInput(activeHotel.organizationId || "");
+        setPropGroqKeyInput(activeHotel.groqApiKey || "");
       }
     }
   }, [selectedPropId, properties]);
@@ -173,6 +175,7 @@ export default function SuperAdminPage() {
         timezone: propTimezoneInput,
         currency: propCurrencyInput,
         organizationId: propOrgInput,
+        groqApiKey: propGroqKeyInput,
       });
       if (res.success) {
         await loadSaaSData();
@@ -528,6 +531,16 @@ export default function SuperAdminPage() {
                                         <option key={org.id} value={org.id}>{org.name}</option>
                                       ))}
                                     </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] text-text-muted block font-semibold">Groq AI API Integration Key</label>
+                                    <input
+                                      type="password"
+                                      placeholder="e.g. gsk_N690Fba..."
+                                      value={propGroqKeyInput}
+                                      onChange={(e) => setPropGroqKeyInput(e.target.value)}
+                                      className="w-full px-2 py-1 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-mono"
+                                    />
                                   </div>
                                   <button
                                     type="submit"

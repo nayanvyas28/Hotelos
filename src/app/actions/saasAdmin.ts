@@ -69,6 +69,7 @@ export async function updateSaaSPropertyAction(
     currency?: string;
     timezone?: string;
     organizationId?: string;
+    groqApiKey?: string;
   }
 ) {
   try {

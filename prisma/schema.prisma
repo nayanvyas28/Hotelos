@@ -52,6 +52,7 @@ model Property {
   auditLogs      AuditLog[]
   webhooks       WebhookSubscription[]
   apiKeys        ApiKey[]
+  groqApiKey     String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 }

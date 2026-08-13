@@ -237,6 +237,68 @@ export async function askAICopilotAction(propertyId: string, prompt: string) {
   }
 
   try {
+    const property = await db.property.findUnique({ where: { id: propertyId } });
+    
+    // If a dedicated Groq API Key has been provisioned for this tenant, call Groq LLM API
+    if (property?.groqApiKey) {
+      try {
+        const roomsCount = await db.room.count({ where: { propertyId } });
+        const activeStays = await db.reservation.count({
+          where: { propertyId, status: "CHECKED_IN" },
+        });
+        const totalPayments = await db.folioPayment.findMany({
+          where: { folio: { reservation: { propertyId } } },
+        });
+        const revenueSum = totalPayments.reduce((sum, p) => sum + (p.type === "REFUND" ? -p.amount : p.amount), 0);
+        const companyCount = await db.company.count({ where: { propertyId } });
+
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${property.groqApiKey}`,
+          },
+          body: JSON.stringify({
+            model: "llama-3.1-8b-instant",
+            messages: [
+              {
+                role: "system",
+                content: `You are the HotelOS AI Copilot, a helpful advisory assistant for hotel property operations at "${property.name}". 
+Use these real-time hotel operational facts to contextually answer queries:
+- Total Room Inventory: ${roomsCount} rooms
+- Current Active Checked-In Guests: ${activeStays} guests
+- Total Realized Cash Revenue: INR ${revenueSum.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+- Active Corporate Client Groups: ${companyCount} accounts
+
+Be direct, highly professional, operational-centric, and provide actionable tips in standard markdown format.`
+              },
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 1024,
+          })
+        });
+
+        if (response.ok) {
+          const resultJson = await response.json();
+          const answerText = resultJson.choices?.[0]?.message?.content;
+          if (answerText) {
+            return {
+              success: true,
+              answer: answerText
+            };
+          }
+        } else {
+          console.warn("Groq API returned an error response:", await response.text());
+        }
+      } catch (err: any) {
+        console.error("Failed calling Groq LLM API, falling back to local model...", err);
+      }
+    }
+
     const query = prompt.trim().toLowerCase();
 
     // 1. Occupancy questions
