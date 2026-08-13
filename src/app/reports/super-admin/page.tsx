@@ -22,6 +22,12 @@ import {
   updateSaaSPropertyIntegrationsAction
 } from "@/app/actions/saasApi";
 import {
+  logSaaSSupportSessionStartAction,
+  getSaaSAnnouncementsAction,
+  createSaaSAnnouncementAction,
+  deleteSaaSAnnouncementAction
+} from "@/app/actions/saasSupport";
+import {
   ShieldCheck,
   Plus,
   RefreshCw,
@@ -52,7 +58,20 @@ export default function SuperAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations">("command");
+  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations" | "broadcasts">("command");
+
+  // Support Simulator & Broadcast states
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState("");
+  const [newAnnouncementContent, setNewAnnouncementContent] = useState("");
+  const [newAnnouncementLevel, setNewAnnouncementLevel] = useState("info");
+  const [newAnnouncementPropId, setNewAnnouncementPropId] = useState<string | null>(null);
+
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [supportReason, setSupportReason] = useState("");
+  const [supportDuration, setSupportDuration] = useState(30);
+
+  const [featureFlagsInput, setFeatureFlagsInput] = useState<string[]>([]);
 
   // Integrations & API management states
   const [apiKeys, setApiKeys] = useState<any[]>([]);
@@ -129,6 +148,7 @@ export default function SuperAdminPage() {
         setDeploymentInput(activeHotel.deploymentMode || "SaaS");
         setModulesInput(activeHotel.activeModulesString ? activeHotel.activeModulesString.split(",") : ["PMS", "Housekeeping"]);
         setGroqKeyInput(activeHotel.groqApiKey || "");
+        setFeatureFlagsInput(activeHotel.featureFlagsString ? activeHotel.featureFlagsString.split(",") : []);
 
         // Hydrate UI Config
         try {
@@ -268,6 +288,111 @@ export default function SuperAdminPage() {
     }
   };
 
+  // Support Simulator & Announcements Action triggers
+  const handleLaunchSupportSession = (propertyId: string) => {
+    setSelectedPropId(propertyId);
+    setSupportReason("");
+    setSupportDuration(30);
+    setIsSupportModalOpen(true);
+  };
+
+  const handleConfirmSupportSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropId || !supportReason) return;
+    setIsActionLoading(true);
+    try {
+      const res = await logSaaSSupportSessionStartAction(selectedPropId, supportReason, supportDuration);
+      if (res.success) {
+        const prop = properties.find((p) => p.id === selectedPropId);
+        const expiresAt = Date.now() + supportDuration * 60 * 1000;
+        
+        sessionStorage.setItem("hotelos_support_session_active", "true");
+        sessionStorage.setItem("hotelos_support_session_prop_id", selectedPropId);
+        sessionStorage.setItem("hotelos_support_session_prop_name", prop?.name || "Support Target");
+        sessionStorage.setItem("hotelos_support_session_reason", supportReason);
+        sessionStorage.setItem("hotelos_support_session_expires", String(expiresAt));
+
+        setIsSupportModalOpen(false);
+        alert(`Audited JIT support session initialized for ${prop?.name || "Target Property"}! Redirecting...`);
+        window.location.href = "/";
+      } else {
+        alert(res.error || "Failed to start support session.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const loadAnnouncements = async () => {
+    try {
+      const res = await getSaaSAnnouncementsAction();
+      if (res.success && res.announcements) {
+        setAnnouncements(res.announcements);
+      }
+    } catch (err) {
+      console.error("Failed to load announcements:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "broadcasts") {
+      loadAnnouncements();
+    }
+  }, [activeTab]);
+
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAnnouncementTitle || !newAnnouncementContent) return;
+    setIsActionLoading(true);
+    try {
+      const res = await createSaaSAnnouncementAction(
+        newAnnouncementTitle,
+        newAnnouncementContent,
+        newAnnouncementLevel,
+        newAnnouncementPropId
+      );
+      if (res.success) {
+        setNewAnnouncementTitle("");
+        setNewAnnouncementContent("");
+        setNewAnnouncementLevel("info");
+        setNewAnnouncementPropId(null);
+        await loadAnnouncements();
+        alert("Broadcast announcement successfully published!");
+      } else {
+        alert(res.error || "Failed to publish announcement.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this broadcast notice?")) return;
+    try {
+      const res = await deleteSaaSAnnouncementAction(id);
+      if (res.success) {
+        await loadAnnouncements();
+        alert("Announcement deleted.");
+      } else {
+        alert(res.error || "Failed to delete.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    }
+  };
+
+  const toggleFeatureFlag = (flagName: string) => {
+    if (featureFlagsInput.includes(flagName)) {
+      setFeatureFlagsInput(featureFlagsInput.filter((f) => f !== flagName));
+    } else {
+      setFeatureFlagsInput([...featureFlagsInput, flagName]);
+    }
+  };
+
   // Handle License & Modules save
   const handleSaveLicenseSettings = async () => {
     if (!selectedPropId) return;
@@ -278,6 +403,7 @@ export default function SuperAdminPage() {
         deploymentMode: deploymentInput,
         activeModulesString: modulesInput.join(","),
         groqApiKey: groqKeyInput,
+        featureFlagsString: featureFlagsInput.join(","),
       });
 
       if (res.success) {
@@ -588,6 +714,16 @@ export default function SuperAdminPage() {
                   >
                     <Wifi className="w-3.5 h-3.5" /> API & Integrations
                   </button>
+                  <button
+                    onClick={() => setActiveTab("broadcasts")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "broadcasts"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Content & Broadcasts
+                  </button>
                 </div>
               </div>
 
@@ -785,12 +921,20 @@ export default function SuperAdminPage() {
                                       </span>
                                     </td>
                                     <td className="p-4 text-right">
-                                      <button
-                                        onClick={() => handleDeleteProperty(prop.id)}
-                                        className="p-1 text-text-muted hover:text-error transition-all rounded hover:bg-surface-secondary inline-flex"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
+                                      <div className="flex justify-end items-center gap-2">
+                                        <button
+                                          onClick={() => handleLaunchSupportSession(prop.id)}
+                                          className="inline-flex items-center justify-center px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-bold rounded transition-all"
+                                        >
+                                          Support Session
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteProperty(prop.id)}
+                                          className="p-1 text-text-muted hover:text-error transition-all rounded hover:bg-surface-secondary inline-flex"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
@@ -907,6 +1051,42 @@ export default function SuperAdminPage() {
                                 onChange={(e) => setGroqKeyInput(e.target.value)}
                                 className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface-secondary text-text-primary focus:outline-none focus:border-primary font-mono"
                               />
+                            </div>
+                            
+                            {/* Feature Flags */}
+                            <div className="space-y-3">
+                              <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Entitled Feature Flags</label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {[
+                                  { key: "beta_rates_engine", label: "Beta Rates Engine", desc: "Seasonal auto-rates calculation" },
+                                  { key: "ai_smart_replies", label: "AI Smart Replies", desc: "Groq response drafting helper" },
+                                  { key: "multicurrency_billing", label: "Multi-Currency Billing", desc: "USD/EUR/INR forex support" },
+                                  { key: "auto_night_audit", label: "Auto-Night Audit", desc: "02:00 AM sweep triggers" }
+                                ].map((flag) => {
+                                  const isEnabled = featureFlagsInput.includes(flag.key);
+                                  return (
+                                    <label
+                                      key={flag.key}
+                                      className={`flex items-start justify-between p-3 border rounded cursor-pointer transition-all ${
+                                        isEnabled
+                                          ? "border-indigo-500/40 bg-indigo-500/5 text-indigo-700 dark:text-indigo-400"
+                                          : "border-border-default bg-surface hover:bg-surface-secondary"
+                                      }`}
+                                    >
+                                      <div className="space-y-0.5">
+                                        <div className="text-xs font-bold">{flag.label}</div>
+                                        <div className="text-[9px] text-text-muted">{flag.desc}</div>
+                                      </div>
+                                      <input
+                                        type="checkbox"
+                                        checked={isEnabled}
+                                        onChange={() => toggleFeatureFlag(flag.key)}
+                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5 mt-0.5"
+                                      />
+                                    </label>
+                                  );
+                                })}
+                              </div>
                             </div>
 
                             {/* Save Actions and Database migrations sync */}
@@ -1312,6 +1492,124 @@ export default function SuperAdminPage() {
                     </div>
                   )}
 
+                  {/* TAB 7: BROADCASTS & ANNOUNCEMENTS */}
+                  {activeTab === "broadcasts" && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 font-sans">
+                      {/* Left: Compose Broadcast Notice */}
+                      <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
+                        <div className="border-b border-border-default pb-3">
+                          <h3 className="text-sm font-bold text-text-primary">Publish System Broadcast</h3>
+                          <p className="text-[10px] text-text-muted mt-1">Send a real-time system message/alert to hotel instances.</p>
+                        </div>
+                        <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Announcement Title</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Scheduled Maintenance Downtime"
+                              value={newAnnouncementTitle}
+                              onChange={(e) => setNewAnnouncementTitle(e.target.value)}
+                              className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Notice Message Content</label>
+                            <textarea
+                              placeholder="Describe the notice (markdown or plain text)..."
+                              value={newAnnouncementContent}
+                              onChange={(e) => setNewAnnouncementContent(e.target.value)}
+                              rows={4}
+                              className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-semibold"
+                              required
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Severity Level</label>
+                              <select
+                                value={newAnnouncementLevel}
+                                onChange={(e) => setNewAnnouncementLevel(e.target.value)}
+                                className="w-full text-xs font-semibold px-3 py-2 border border-border-default rounded bg-surface text-text-primary focus:outline-none"
+                              >
+                                <option value="info">Info (Blue)</option>
+                                <option value="warning">Warning (Amber)</option>
+                                <option value="critical">Critical (Red)</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Target Property Scope</label>
+                              <select
+                                value={newAnnouncementPropId || ""}
+                                onChange={(e) => setNewAnnouncementPropId(e.target.value || null)}
+                                className="w-full text-xs font-semibold px-3 py-2 border border-border-default rounded bg-surface text-text-primary focus:outline-none"
+                              >
+                                <option value="">All Hotels (Global)</option>
+                                {properties.map((p) => (
+                                  <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isActionLoading}
+                            className="w-full py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded shadow-small transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" /> Broadcast Announcement
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Right: Broadcast Registry & Active Notices */}
+                      <div className="lg:col-span-2 space-y-4">
+                        <h3 className="text-sm font-bold text-text-primary">Active Platform Broadcasts</h3>
+                        {announcements.length === 0 ? (
+                          <div className="bg-surface border border-border-default rounded-lg p-8 text-center text-text-muted text-xs">
+                            No active system announcements or notices are currently broadcasted.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-4">
+                            {announcements.map((ann) => {
+                              const levelStyles: Record<string, string> = {
+                                info: "bg-blue-500/10 border-blue-500/20 text-blue-800 dark:text-blue-400",
+                                warning: "bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-400",
+                                critical: "bg-rose-500/10 border-rose-500/20 text-rose-800 dark:text-rose-400",
+                              };
+                              return (
+                                <div key={ann.id} className="bg-surface border border-border-default rounded-lg p-4 shadow-sm flex items-start justify-between gap-4">
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`px-2 py-0.5 border text-[9px] font-bold uppercase rounded-full tracking-wider ${levelStyles[ann.level] || levelStyles.info}`}>
+                                        {ann.level}
+                                      </span>
+                                      <span className="text-[10px] text-text-muted">
+                                        Scope: <span className="font-bold text-text-secondary">{ann.property?.name || "Global (All Properties)"}</span>
+                                      </span>
+                                      <span className="text-[10px] text-text-muted">• {new Date(ann.createdAt).toLocaleString()}</span>
+                                    </div>
+                                    <h4 className="text-xs font-bold text-text-primary">{ann.title}</h4>
+                                    <p className="text-xxs text-text-secondary leading-normal whitespace-pre-wrap">{ann.content}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDeleteAnnouncement(ann.id)}
+                                    className="p-1.5 hover:bg-rose-500/10 text-text-muted hover:text-error rounded transition-all"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )}
               </div>
@@ -1410,6 +1708,74 @@ export default function SuperAdminPage() {
                   className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded shadow-small"
                 >
                   {isActionLoading ? "Adding..." : "Add Group"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Support Simulation Modal */}
+      {isSupportModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="bg-surface border border-border-default rounded-lg w-full max-w-md p-6 shadow-2xl animate-zoom-in space-y-4 font-sans">
+            <div className="flex items-center gap-2 text-primary">
+              <ShieldCheck className="w-5 h-5" />
+              <h3 className="text-sm font-bold text-text-primary">Simulate Just-In-Time Support Session</h3>
+            </div>
+            
+            <p className="text-[11px] text-text-secondary leading-normal">
+              In accordance with Security Principles, support sessions require an explicit operational reason, are logged in the global audit trail, and automatically expire.
+            </p>
+
+            <form onSubmit={handleConfirmSupportSession} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Access Target</label>
+                <div className="px-3 py-2 border border-border-default rounded bg-surface-secondary text-xs font-bold text-text-primary">
+                  {properties.find((p) => p.id === selectedPropId)?.name || "Selected Property"}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Reason for Break-Glass Access</label>
+                <textarea
+                  placeholder="e.g. Troubleshoot reservation synchronizations latency with Expedia OTA connection"
+                  value={supportReason}
+                  onChange={(e) => setSupportReason(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Session Duration Scope</label>
+                <select
+                  value={supportDuration}
+                  onChange={(e) => setSupportDuration(Number(e.target.value))}
+                  className="w-full text-xs font-semibold px-3 py-2 border border-border-default rounded bg-surface text-text-primary focus:outline-none"
+                >
+                  <option value={15}>15 Minutes</option>
+                  <option value={30}>30 Minutes (Recommended)</option>
+                  <option value={60}>1 Hour</option>
+                  <option value={120}>2 Hours (Max)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSupportModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-text-secondary border border-border-default hover:bg-surface-secondary rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isActionLoading}
+                  className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded shadow-small"
+                >
+                  {isActionLoading ? "Starting Session..." : "Initialize Session"}
                 </button>
               </div>
             </form>

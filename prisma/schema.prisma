@@ -52,6 +52,7 @@ model Property {
   auditLogs      AuditLog[]
   webhooks       WebhookSubscription[]
   apiKeys        ApiKey[]
+  announcements  Announcement[]
   groqApiKey     String?
   planString          String          @default("Starter")
   activeModulesString String          @default("PMS,Housekeeping")
@@ -59,6 +60,7 @@ model Property {
   deploymentMode      String          @default("SaaS")
   appVersion          String          @default("2026.1")
   enabledIntegrationsString String      @default("Stripe,BookingCom")
+  featureFlagsString  String          @default("")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 }
@@ -591,4 +593,14 @@ model ApiKey {
   token      String   @unique // Hashed or UUID key token
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
+}
+
+model Announcement {
+  id          String    @id @default(uuid())
+  title       String
+  content     String
+  level       String    @default("info") // info, warning, critical
+  propertyId  String?   // NULL means global broadcast to all
+  property    Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
 }

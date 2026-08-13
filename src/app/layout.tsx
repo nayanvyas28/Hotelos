@@ -5,6 +5,7 @@ import { SessionProvider } from "@/context/SessionContext";
 import { SyncProvider } from "@/context/SyncContext";
 import LoginGuard from "@/components/layout/LoginGuard";
 import CommandCenter from "@/components/layout/CommandCenter";
+import GlobalSaaSBanners from "@/components/layout/GlobalSaaSBanners";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SessionProvider>
           <SyncProvider>
             <LoginGuard>
+              <GlobalSaaSBanners />
               {children}
               <CommandCenter />
             </LoginGuard>

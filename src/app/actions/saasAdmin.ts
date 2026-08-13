@@ -75,6 +75,7 @@ export async function updateSaaSPropertyAction(
     uiConfigString?: string;
     deploymentMode?: string;
     appVersion?: string;
+    featureFlagsString?: string;
   }
 ) {
   try {
