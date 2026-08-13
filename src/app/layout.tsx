@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/context/SessionContext";
+import { SyncProvider } from "@/context/SyncContext";
 import LoginGuard from "@/components/layout/LoginGuard";
 import CommandCenter from "@/components/layout/CommandCenter";
 
@@ -29,10 +30,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <SessionProvider>
-          <LoginGuard>
-            {children}
-            <CommandCenter />
-          </LoginGuard>
+          <SyncProvider>
+            <LoginGuard>
+              {children}
+              <CommandCenter />
+            </LoginGuard>
+          </SyncProvider>
         </SessionProvider>
       </body>
     </html>
