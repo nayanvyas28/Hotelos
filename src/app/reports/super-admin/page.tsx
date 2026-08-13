@@ -28,6 +28,12 @@ import {
   deleteSaaSAnnouncementAction
 } from "@/app/actions/saasSupport";
 import {
+  getSaaSTaxonomyItemsAction,
+  createSaaSTaxonomyItemAction,
+  updateSaaSTaxonomyItemAction,
+  deleteSaaSTaxonomyItemAction
+} from "@/app/actions/saasTaxonomy";
+import {
   ShieldCheck,
   Plus,
   RefreshCw,
@@ -58,7 +64,7 @@ export default function SuperAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations" | "broadcasts">("command");
+  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations" | "broadcasts" | "taxonomy">("command");
 
   // Support Simulator & Broadcast states
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -72,6 +78,16 @@ export default function SuperAdminPage() {
   const [supportDuration, setSupportDuration] = useState(30);
 
   const [featureFlagsInput, setFeatureFlagsInput] = useState<string[]>([]);
+
+  // Taxonomy states
+  const [taxonomyItems, setTaxonomyItems] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("ROOM_TYPE");
+  const [newTaxName, setNewTaxName] = useState("");
+  const [newTaxCode, setNewTaxCode] = useState("");
+  const [editingTaxId, setEditingTaxId] = useState<string | null>(null);
+  const [editingTaxName, setEditingTaxName] = useState("");
+  const [editingTaxCode, setEditingTaxCode] = useState("");
+  const [editingTaxActive, setEditingTaxActive] = useState(true);
 
   // Integrations & API management states
   const [apiKeys, setApiKeys] = useState<any[]>([]);
@@ -390,6 +406,89 @@ export default function SuperAdminPage() {
       setFeatureFlagsInput(featureFlagsInput.filter((f) => f !== flagName));
     } else {
       setFeatureFlagsInput([...featureFlagsInput, flagName]);
+    }
+  };
+
+  // Taxonomy Action triggers
+  const loadTaxonomyItems = async () => {
+    try {
+      const res = await getSaaSTaxonomyItemsAction(selectedCategory);
+      if (res.success && res.items) {
+        setTaxonomyItems(res.items);
+      }
+    } catch (err) {
+      console.error("Failed to load taxonomy items:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "taxonomy") {
+      loadTaxonomyItems();
+    }
+  }, [activeTab, selectedCategory]);
+
+  const handleCreateTaxonomyItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaxName || !newTaxCode) return;
+    setIsActionLoading(true);
+    try {
+      const res = await createSaaSTaxonomyItemAction(selectedCategory, newTaxName, newTaxCode);
+      if (res.success) {
+        setNewTaxName("");
+        setNewTaxCode("");
+        await loadTaxonomyItems();
+        alert("Taxonomy item successfully published to global catalog!");
+      } else {
+        alert(res.error || "Failed to publish taxonomy item.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleUpdateTaxonomyItem = async (id: string) => {
+    if (!editingTaxName || !editingTaxCode) return;
+    try {
+      const res = await updateSaaSTaxonomyItemAction(id, editingTaxName, editingTaxCode, editingTaxActive);
+      if (res.success) {
+        setEditingTaxId(null);
+        await loadTaxonomyItems();
+        alert("Taxonomy item successfully updated.");
+      } else {
+        alert(res.error || "Failed to update item.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    }
+  };
+
+  const handleToggleTaxonomyActive = async (id: string, name: string, code: string, currentActive: boolean) => {
+    try {
+      const res = await updateSaaSTaxonomyItemAction(id, name, code, !currentActive);
+      if (res.success) {
+        await loadTaxonomyItems();
+      } else {
+        alert(res.error || "Failed to toggle status.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    }
+  };
+
+  const handleDeleteTaxonomyItem = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this taxonomy item? This will remove it globally.")) return;
+    try {
+      const res = await deleteSaaSTaxonomyItemAction(id);
+      if (res.success) {
+        await loadTaxonomyItems();
+        alert("Taxonomy item deleted successfully.");
+      } else {
+        alert(res.error || "Failed to delete item.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
     }
   };
 
@@ -723,6 +822,16 @@ export default function SuperAdminPage() {
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5" /> Content & Broadcasts
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("taxonomy")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "taxonomy"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <HardDrive className="w-3.5 h-3.5" /> Master Data & Taxonomy
                   </button>
                 </div>
               </div>
@@ -1606,6 +1715,187 @@ export default function SuperAdminPage() {
                             })}
                           </div>
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 8: GLOBAL MASTER DATA & TAXONOMY */}
+                  {activeTab === "taxonomy" && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 font-sans">
+                      {/* Left: Compose Taxonomy Item */}
+                      <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
+                        <div className="border-b border-border-default pb-3">
+                          <h3 className="text-sm font-bold text-text-primary">Publish Master Taxonomy</h3>
+                          <p className="text-[10px] text-text-muted mt-1">Configure global standard properties taxonomy metadata definitions.</p>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Taxonomy Category</label>
+                          <select
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            className="w-full text-xs font-bold px-3 py-2 border border-border-default rounded bg-surface text-text-primary focus:outline-none"
+                          >
+                            <option value="ROOM_TYPE">Room Types (e.g. Deluxe Room)</option>
+                            <option value="ROOM_FEATURE">Room Features (e.g. Balcony)</option>
+                            <option value="AMENITY">Hotel Amenities (e.g. Free Wi-Fi)</option>
+                            <option value="PAYMENT_METHOD">Payment Methods (e.g. UPI Instant)</option>
+                          </select>
+                        </div>
+
+                        <form onSubmit={handleCreateTaxonomyItem} className="space-y-4 pt-1">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Standard Name</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Deluxe Room"
+                              value={newTaxName}
+                              onChange={(e) => setNewTaxName(e.target.value)}
+                              className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Short Code identifier</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. DLX"
+                              value={newTaxCode}
+                              onChange={(e) => setNewTaxCode(e.target.value)}
+                              className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-mono uppercase font-bold"
+                              maxLength={6}
+                              required
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isActionLoading}
+                            className="w-full py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded shadow-small transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Publish to Catalog
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Right: Master Data catalog view */}
+                      <div className="lg:col-span-2 space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="text-sm font-bold text-text-primary">
+                            Global Catalog: <span className="text-primary">{selectedCategory.replace("_", " ")}S</span>
+                          </h3>
+                        </div>
+
+                        <div className="bg-surface border border-border-default rounded-lg shadow-sm overflow-hidden">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-surface-secondary border-b border-border-default text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                                <th className="p-3">Standard Name</th>
+                                <th className="p-3 font-mono">Identifier Code</th>
+                                <th className="p-3">System status</th>
+                                <th className="p-3 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-default">
+                              {taxonomyItems.length === 0 ? (
+                                <tr>
+                                  <td colSpan={4} className="p-8 text-center text-text-muted text-xs">
+                                    No records found in this category. Use the form to add one.
+                                  </td>
+                                </tr>
+                              ) : (
+                                taxonomyItems.map((item) => {
+                                  const isEditing = editingTaxId === item.id;
+                                  return (
+                                    <tr key={item.id} className="hover:bg-surface-secondary/20 transition-all">
+                                      <td className="p-3">
+                                        {isEditing ? (
+                                          <input
+                                            type="text"
+                                            value={editingTaxName}
+                                            onChange={(e) => setEditingTaxName(e.target.value)}
+                                            className="px-2 py-1 border border-border-default rounded bg-surface text-xs font-bold text-text-primary focus:outline-none focus:border-primary"
+                                          />
+                                        ) : (
+                                          <span className="font-semibold text-text-secondary">{item.name}</span>
+                                        )}
+                                      </td>
+                                      <td className="p-3 font-mono font-bold">
+                                        {isEditing ? (
+                                          <input
+                                            type="text"
+                                            value={editingTaxCode}
+                                            onChange={(e) => setEditingTaxCode(e.target.value)}
+                                            className="px-2 py-1 border border-border-default rounded bg-surface text-xs font-mono font-bold text-text-primary focus:outline-none focus:border-primary uppercase"
+                                            maxLength={6}
+                                          />
+                                        ) : (
+                                          <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[10px] rounded border border-border-default">
+                                            {item.code}
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="p-3">
+                                        {isEditing ? (
+                                          <select
+                                            value={editingTaxActive ? "true" : "false"}
+                                            onChange={(e) => setEditingTaxActive(e.target.value === "true")}
+                                            className="px-2 py-1 border border-border-default rounded bg-surface text-xs font-bold text-text-primary focus:outline-none focus:border-primary"
+                                          >
+                                            <option value="true">Active</option>
+                                            <option value="false">Inactive</option>
+                                          </select>
+                                        ) : (
+                                          <button
+                                            onClick={() => handleToggleTaxonomyActive(item.id, item.name, item.code, item.isActive)}
+                                            className={`px-2.5 py-0.5 text-[9px] font-bold uppercase rounded-full border transition-all ${
+                                              item.isActive
+                                                ? "bg-success/10 border-success/20 text-success"
+                                                : "bg-slate-100 dark:bg-slate-800 border-border-default text-text-muted"
+                                            }`}
+                                          >
+                                            {item.isActive ? "Active" : "Inactive"}
+                                          </button>
+                                        )}
+                                      </td>
+                                      <td className="p-3 text-right">
+                                        <div className="flex justify-end gap-1.5">
+                                          {isEditing ? (
+                                            <button
+                                              onClick={() => handleUpdateTaxonomyItem(item.id)}
+                                              className="px-2.5 py-1 bg-success hover:bg-success-hover text-white text-[10px] font-bold rounded shadow-small"
+                                            >
+                                              Save
+                                            </button>
+                                          ) : (
+                                            <button
+                                              onClick={() => {
+                                                setEditingTaxId(item.id);
+                                                setEditingTaxName(item.name);
+                                                setEditingTaxCode(item.code);
+                                                setEditingTaxActive(item.isActive);
+                                              }}
+                                              className="p-1 text-text-muted hover:text-primary transition-all rounded hover:bg-surface-secondary"
+                                            >
+                                              <Edit className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() => handleDeleteTaxonomyItem(item.id)}
+                                            className="p-1 text-text-muted hover:text-error transition-all rounded hover:bg-surface-secondary"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   )}

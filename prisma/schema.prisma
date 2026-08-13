@@ -604,3 +604,12 @@ model Announcement {
   property    Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
 }
+
+model GlobalTaxonomy {
+  id        String   @id @default(uuid())
+  category  String   // e.g. "ROOM_TYPE", "ROOM_FEATURE", "AMENITY", "PAYMENT_METHOD"
+  name      String
+  code      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
