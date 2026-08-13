@@ -38,6 +38,7 @@ export async function authenticateUserAction(email: string) {
         role: roleName,
         scope: roleName === "SAAS_OWNER" || roleName === "MD" || roleName === "CFO" ? "GLOBAL" : "PROPERTY",
         propertyId: property?.id || undefined,
+        dbPassword: user.password || undefined,
       },
     };
   } catch (error: any) {

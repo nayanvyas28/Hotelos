@@ -189,3 +189,132 @@ export async function deleteSaaSOrganizationAction(organizationId: string) {
     return { success: false, error: error.message };
   }
 }
+
+/**
+ * Fetches the MD User (Organization Owner) email and password for a selected property.
+ */
+export async function getSaaSPropertyOwnerAction(propertyId: string) {
+  if (!propertyId) return { success: false, error: "Property ID is required." };
+
+  try {
+    const prop = await db.property.findUnique({
+      where: { id: propertyId },
+      include: {
+        organization: {
+          include: {
+            users: {
+              where: {
+                userRoles: {
+                  some: {
+                    role: { name: "MD" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const mdUser = prop?.organization?.users[0];
+    return {
+      success: true,
+      ownerEmail: mdUser?.email || "",
+      ownerPassword: mdUser?.password || "",
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Updates or creates the MD User (Organization Owner) email and password credentials.
+ */
+export async function updateSaaSPropertyOwnerAction(
+  propertyId: string,
+  email: string,
+  password?: string
+) {
+  if (!propertyId || !email) {
+    return { success: false, error: "Property ID and Owner Email are required." };
+  }
+
+  try {
+    const prop = await db.property.findUnique({
+      where: { id: propertyId },
+    });
+
+    if (!prop) return { success: false, error: "Property not found." };
+
+    // Find MD Role
+    let mdRole = await db.role.findUnique({
+      where: { name: "MD" },
+    });
+    if (!mdRole) {
+      mdRole = await db.role.create({
+        data: {
+          name: "MD",
+          description: "Managing Director (Organization Owner)",
+        },
+      });
+    }
+
+    const emailLower = email.trim().toLowerCase();
+
+    // Look for existing MD user in this organization
+    const existingMd = await db.user.findFirst({
+      where: {
+        organizationId: prop.organizationId,
+        userRoles: {
+          some: {
+            role: { name: "MD" },
+          },
+        },
+      },
+    });
+
+    if (existingMd) {
+      // Update existing MD email and password
+      await db.user.update({
+        where: { id: existingMd.id },
+        data: {
+          email: emailLower,
+          password: password || "",
+        },
+      });
+    } else {
+      // Create new MD user in this organization
+      const newUser = await db.user.create({
+        data: {
+          email: emailLower,
+          password: password || "",
+          firstName: "Organization",
+          lastName: "Administrator",
+          organizationId: prop.organizationId,
+        },
+      });
+
+      // Link User to MD Role
+      await db.userRole.create({
+        data: {
+          userId: newUser.id,
+          roleId: mdRole.id,
+        },
+      });
+    }
+
+    // Add audit log record
+    await db.auditLog.create({
+      data: {
+        propertyId,
+        action: "LICENSE_CHANGE",
+        performedBy: "owner@hotelos.com",
+        details: `Updated tenant organization owner credentials to email: ${emailLower}.`,
+      },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

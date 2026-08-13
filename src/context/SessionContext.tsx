@@ -138,7 +138,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const { authenticateUserAction } = await import("@/app/actions/auth");
       const res = await authenticateUserAction(email);
       if (res.success && res.user) {
-        const dbUser = res.user as UserProfile;
+        const dbUser = res.user as UserProfile & { dbPassword?: string };
+        
+        // Validate password match if database password is set
+        if (dbUser.dbPassword && dbUser.dbPassword !== "") {
+          if (password !== dbUser.dbPassword) {
+            return false;
+          }
+        }
+
         setCurrentUser(dbUser);
         localStorage.setItem("hotelos_active_user", JSON.stringify(dbUser));
         if (dbUser.propertyId) {

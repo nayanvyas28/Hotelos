@@ -11,7 +11,9 @@ import {
   deleteSaaSPropertyAction,
   createSaaSOrganizationAction,
   updateSaaSOrganizationAction,
-  deleteSaaSOrganizationAction
+  deleteSaaSOrganizationAction,
+  getSaaSPropertyOwnerAction,
+  updateSaaSPropertyOwnerAction
 } from "@/app/actions/saasAdmin";
 import {
   getSaaSPropertyApiAndIntegrationsAction,
@@ -142,6 +144,10 @@ export default function SuperAdminPage() {
   const [accentColorInput, setAccentColorInput] = useState("#D4AF37");
   const [brandNameInput, setBrandNameInput] = useState("HotelOS");
 
+  // Owner Credentials States
+  const [ownerEmailInput, setOwnerEmailInput] = useState("");
+  const [ownerPasswordInput, setOwnerPasswordInput] = useState("");
+
   // Simulation Logs
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -175,6 +181,19 @@ export default function SuperAdminPage() {
     loadSaaSData();
   }, []);
 
+  // Load owner credentials from DB
+  const loadOwnerCredentials = async (propertyId: string) => {
+    try {
+      const res = await getSaaSPropertyOwnerAction(propertyId);
+      if (res.success) {
+        setOwnerEmailInput(res.ownerEmail || "");
+        setOwnerPasswordInput(res.ownerPassword || "");
+      }
+    } catch (err) {
+      console.error("Failed to load owner credentials:", err);
+    }
+  };
+
   // Update selection states on property selection
   useEffect(() => {
     if (selectedPropId && properties.length > 0) {
@@ -203,6 +222,9 @@ export default function SuperAdminPage() {
           setAccentColorInput("#D4AF37");
           setBrandNameInput("HotelOS");
         }
+
+        // Hydrate Owner Credentials
+        loadOwnerCredentials(selectedPropId);
       }
     }
   }, [selectedPropId, properties]);
@@ -596,6 +618,31 @@ export default function SuperAdminPage() {
       }
     } catch (err: any) {
       alert(err.message || "Failed to save license entitlements.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // Handle Owner Credentials save
+  const handleSaveOwnerCredentials = async () => {
+    if (!selectedPropId || !ownerEmailInput) {
+      alert("Owner administrator email is required.");
+      return;
+    }
+    setIsActionLoading(true);
+    try {
+      const res = await updateSaaSPropertyOwnerAction(
+        selectedPropId,
+        ownerEmailInput,
+        ownerPasswordInput
+      );
+      if (res.success) {
+        alert("Organization Owner (MD) credentials successfully updated in database!");
+      } else {
+        alert(res.error || "Failed to update owner credentials.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
     } finally {
       setIsActionLoading(false);
     }
@@ -1335,6 +1382,49 @@ export default function SuperAdminPage() {
                                 ))}
                               </div>
                             )}
+
+                            {/* Organization Owner Credentials Section */}
+                            <div className="pt-6 border-t border-border-default mt-6 space-y-4">
+                              <div>
+                                <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Organization Owner (MD) Account</h4>
+                                <p className="text-[11px] text-text-secondary mt-0.5">
+                                  Configure the login email and password for the master account of this organization group.
+                                </p>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Owner Login Email</label>
+                                  <input
+                                    type="email"
+                                    value={ownerEmailInput}
+                                    onChange={(e) => setOwnerEmailInput(e.target.value)}
+                                    placeholder="e.g. md.marriott@hotelos.com"
+                                    className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Access Password</label>
+                                  <input
+                                    type="text"
+                                    value={ownerPasswordInput}
+                                    onChange={(e) => setOwnerPasswordInput(e.target.value)}
+                                    placeholder="Enter access password"
+                                    className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex justify-end pt-2">
+                                <button
+                                  onClick={handleSaveOwnerCredentials}
+                                  disabled={isActionLoading || !ownerEmailInput}
+                                  className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded shadow-sm transition-all"
+                                >
+                                  Update Owner Credentials
+                                </button>
+                              </div>
+                            </div>
 
                           </div>
                         ) : (

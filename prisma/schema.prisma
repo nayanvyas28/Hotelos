@@ -70,6 +70,7 @@ model Property {
 model User {
   id             String        @id @default(uuid()) // Can map to Supabase auth user ID
   email          String        @unique
+  password       String?       @default("")
   firstName      String?
   lastName       String?
   organizationId String?
