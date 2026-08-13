@@ -32,8 +32,13 @@ export async function getSaaSOverviewAction() {
 export async function createSaaSPropertyAction(
   orgName: string,
   propertyName: string,
-  address: string
+  address: string,
+  ownerEmail: string
 ) {
+  if (!ownerEmail || !ownerEmail.includes("@")) {
+    return { success: false, error: "A valid corporate administrator email is required." };
+  }
+
   try {
     // 1. Find or create Organization
     let org = await db.organization.findFirst({
@@ -55,74 +60,42 @@ export async function createSaaSPropertyAction(
       },
     });
 
-    // 3. Auto-generate default roles if missing in DB
-    const roles = ["MD", "GM", "FRONT_DESK"];
-    const roleIdMap: Record<string, string> = {};
-
-    for (const roleName of roles) {
-      let roleRecord = await db.role.findUnique({
-        where: { name: roleName },
+    // 3. Find or create MD Role record
+    let mdRole = await db.role.findUnique({
+      where: { name: "MD" },
+    });
+    if (!mdRole) {
+      mdRole = await db.role.create({
+        data: {
+          name: "MD",
+          description: "Managing Director (Organization Owner)",
+        },
       });
-      if (!roleRecord) {
-        roleRecord = await db.role.create({
-          data: {
-            name: roleName,
-            description: `${roleName} default system role`,
-          },
-        });
-      }
-      roleIdMap[roleName] = roleRecord.id;
     }
 
-    // 4. Auto-generate default user credentials for this client group
-    const sanitizedOrg = orgName.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const sanitizedProp = propertyName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    // 4. Provision single master organization owner (MD)
+    const emailLower = ownerEmail.trim().toLowerCase();
+    let userRecord = await db.user.findUnique({
+      where: { email: emailLower },
+    });
 
-    const defaultUsers = [
-      {
-        email: `md.${sanitizedOrg}@hotelos.com`,
-        firstName: "Managing",
-        lastName: "Director",
-        role: "MD",
-      },
-      {
-        email: `gm.${sanitizedProp}@hotelos.com`,
-        firstName: "General",
-        lastName: "Manager",
-        role: "GM",
-      },
-      {
-        email: `fd.${sanitizedProp}@hotelos.com`,
-        firstName: "Front",
-        lastName: "Desk",
-        role: "FRONT_DESK",
-      },
-    ];
-
-    for (const u of defaultUsers) {
-      const emailLower = u.email.toLowerCase();
-      let userRecord = await db.user.findUnique({
-        where: { email: emailLower },
+    if (!userRecord) {
+      userRecord = await db.user.create({
+        data: {
+          email: emailLower,
+          firstName: "Organization",
+          lastName: "Administrator",
+          organizationId: org.id,
+        },
       });
 
-      if (!userRecord) {
-        userRecord = await db.user.create({
-          data: {
-            email: emailLower,
-            firstName: u.firstName,
-            lastName: u.lastName,
-            organizationId: org.id,
-          },
-        });
-
-        // Link user to role
-        await db.userRole.create({
-          data: {
-            userId: userRecord.id,
-            roleId: roleIdMap[u.role],
-          },
-        });
-      }
+      // Link user to MD role
+      await db.userRole.create({
+        data: {
+          userId: userRecord.id,
+          roleId: mdRole.id,
+        },
+      });
     }
 
     // 5. Add audit log record
@@ -131,7 +104,7 @@ export async function createSaaSPropertyAction(
         propertyId: prop.id,
         action: "PROVISION_PROPERTY",
         performedBy: "owner@hotelos.com",
-        details: `Successfully provisioned hotel property ${propertyName} under organization ${orgName} and auto-created default staff roles.`,
+        details: `Successfully provisioned hotel property ${propertyName} under organization ${orgName} with master admin account ${emailLower}.`,
       },
     });
 

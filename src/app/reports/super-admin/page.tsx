@@ -122,6 +122,7 @@ export default function SuperAdminPage() {
     orgName: "",
     propName: "",
     address: "",
+    ownerEmail: "",
   });
   const [isOrgOpen, setIsOrgOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
@@ -727,15 +728,18 @@ export default function SuperAdminPage() {
 
   const handleSubmitProperty = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.orgName || !form.propName) return;
+    if (!form.orgName || !form.propName || !form.ownerEmail) {
+      alert("Organization name, Property name, and Administrator email are all required.");
+      return;
+    }
     setIsActionLoading(true);
     try {
-      const res = await createSaaSPropertyAction(form.orgName, form.propName, form.address);
+      const res = await createSaaSPropertyAction(form.orgName, form.propName, form.address, form.ownerEmail);
       if (res.success && res.property) {
         setIsOpen(false);
-        setForm({ orgName: "", propName: "", address: "" });
+        setForm({ orgName: "", propName: "", address: "", ownerEmail: "" });
         await loadSaaSData();
-        alert("New SaaS tenant property successfully registered!");
+        alert("New SaaS tenant property and organization owner successfully registered!");
       } else {
         alert(res.error || "Failed to register tenant.");
       }
@@ -2332,6 +2336,17 @@ export default function SuperAdminPage() {
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Administrator Email (MD / Owner)</label>
+                <input
+                  type="email"
+                  placeholder="e.g. admin@marriott.com"
+                  value={form.ownerEmail}
+                  onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                  required
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
