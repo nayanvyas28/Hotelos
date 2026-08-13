@@ -477,7 +477,7 @@ export default function SuperAdminPage() {
           <RoleProtected allowedRoles={["SAAS_OWNER"]}>
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Sticky Header & Navigation Tab Bar */}
-              <div className="p-6 border-b border-border-default/60 bg-surface/50 backdrop-blur-md space-y-6 shrink-0 shadow-sm z-10">
+              <div className="p-4 border-b border-border-default/60 bg-surface/50 backdrop-blur-md space-y-4 shrink-0 shadow-sm z-10">
                 {/* Header Info */}
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <div>
@@ -527,7 +527,7 @@ export default function SuperAdminPage() {
                 </div>
 
                 {/* 5-Tab Control Tower Navigation */}
-                <div className="flex border-b border-border-default/60 space-x-6 pb-px mt-6 overflow-x-auto scrollbar-none">
+                <div className="flex border-b border-border-default/60 space-x-6 pb-px mt-4 overflow-x-auto scrollbar-none">
                   <button
                     onClick={() => setActiveTab("command")}
                     className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
@@ -592,7 +592,7 @@ export default function SuperAdminPage() {
               </div>
 
               {/* Scrollable Content Pane */}
-              <div className="flex-1 overflow-y-auto p-6 font-sans">
+              <div className="flex-1 overflow-y-auto p-4 font-sans">
                 {isLoading ? (
                   <div className="flex justify-center py-20">
                     <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -602,14 +602,14 @@ export default function SuperAdminPage() {
                     {error}
                   </div>
                 ) : (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                   
                   {/* TAB 1: COMMAND CENTER */}
                   {activeTab === "command" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                       {/* Left: Health and Telemetry */}
-                      <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-surface border border-border-default rounded-lg p-6 shadow-sm space-y-4">
+                      <div className="lg:col-span-2 space-y-4">
+                        <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-3">
                           <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
                             <Server className="w-4 h-4 text-primary" /> Core Infrastructure Health
                           </h3>
@@ -661,8 +661,8 @@ export default function SuperAdminPage() {
                       </div>
 
                       {/* Right: Critical Alerts Panel */}
-                      <div className="space-y-6">
-                        <div className="bg-surface border border-border-default rounded-lg p-6 shadow-sm space-y-4">
+                      <div className="space-y-4">
+                        <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-3">
                           <h3 className="text-sm font-bold text-text-primary">License & System Alerts</h3>
                           <div className="space-y-3">
                             <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded text-xxs space-y-1">
@@ -681,7 +681,7 @@ export default function SuperAdminPage() {
 
                   {/* TAB 2: CLIENTS & PROPERTIES */}
                   {activeTab === "clients" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 font-sans">
                       {/* Left: Client Organizations CRUD */}
                       <div className="space-y-4">
                         <h3 className="text-sm font-bold text-text-primary">Client Organizations</h3>
@@ -803,7 +803,7 @@ export default function SuperAdminPage() {
 
                   {/* TAB 3: LICENSES & MODULES */}
                   {activeTab === "licenses" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 font-sans">
                       {/* Left: Hotels List selection */}
                       <div className="space-y-4">
                         <h3 className="text-sm font-bold text-text-primary">Select Property Location</h3>
@@ -827,10 +827,10 @@ export default function SuperAdminPage() {
                       </div>
 
                       {/* Right: Modules & Entitlements Configurator */}
-                      <div className="lg:col-span-2 space-y-6">
+                      <div className="lg:col-span-2 space-y-4">
                         {selectedPropId ? (
-                          <div className="bg-surface border border-border-default rounded-lg p-6 shadow-sm space-y-6">
-                            <div className="border-b border-border-default pb-4">
+                          <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
+                            <div className="border-b border-border-default pb-3">
                               <h3 className="text-sm font-bold text-text-primary">
                                 License Entitlements: {properties.find((p) => p.id === selectedPropId)?.name}
                               </h3>
@@ -910,7 +910,7 @@ export default function SuperAdminPage() {
                             </div>
 
                             {/* Save Actions and Database migrations sync */}
-                            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-4 border-t border-border-default">
+                            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-3 border-t border-border-default">
                               <button
                                 onClick={handleTriggerSync}
                                 disabled={isSyncing}
@@ -1118,9 +1118,9 @@ export default function SuperAdminPage() {
 
                   {/* TAB 6: API & INTEGRATIONS MARKETPLACE */}
                   {activeTab === "api_integrations" && (
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 font-sans">
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 font-sans">
                       {/* 1. Integrations Marketplace */}
-                      <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm space-y-4">
+                      <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-3">
                         <div className="border-b border-border-default pb-3">
                           <h3 className="text-sm font-bold text-text-primary">Integrations Marketplace</h3>
                           <p className="text-[10px] text-text-muted mt-1">Enable marketplace plugins and monitor third-party gateway connections.</p>
@@ -1181,7 +1181,7 @@ export default function SuperAdminPage() {
                       </div>
 
                       {/* 2. Developer API Keys */}
-                      <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm space-y-6">
+                      <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
                         <div className="border-b border-border-default pb-3">
                           <h3 className="text-sm font-bold text-text-primary">Developer API Keys</h3>
                           <p className="text-[10px] text-text-muted mt-1">Generate developer credentials to interact with this property's PMS endpoints.</p>
@@ -1240,7 +1240,7 @@ export default function SuperAdminPage() {
                       </div>
 
                       {/* 3. Webhook Subscriptions */}
-                      <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm space-y-6">
+                      <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
                         <div className="border-b border-border-default pb-3">
                           <h3 className="text-sm font-bold text-text-primary">Webhook Subscriptions</h3>
                           <p className="text-[10px] text-text-muted mt-1">Configure HTTP push targets to notify your services of real-time property updates.</p>
