@@ -473,131 +473,136 @@ export default function SuperAdminPage() {
           <HeaderStaffSwitcher />
         </header>
 
-        <main className="flex-1 p-6 space-y-6 overflow-y-auto font-sans">
+        <main className="flex-1 flex flex-col overflow-hidden font-sans">
           <RoleProtected allowedRoles={["SAAS_OWNER"]}>
-            <>
-              {/* Header Info */}
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                <div>
-                  <h1 className="text-2xl font-black tracking-tight text-text-primary">SaaS Control Tower</h1>
-                  <p className="text-xs text-text-secondary mt-1">
-                    Manage multi-tenant organizations, allocate API licenses quotas, configure dynamic UI white-labels, and manage releases.
-                  </p>
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Sticky Header & Navigation Tab Bar */}
+              <div className="p-6 border-b border-border-default/60 bg-surface/50 backdrop-blur-md space-y-6 shrink-0 shadow-sm z-10">
+                {/* Header Info */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                  <div>
+                    <h1 className="text-2xl font-black tracking-tight text-text-primary">SaaS Control Tower</h1>
+                    <p className="text-xs text-text-secondary mt-1">
+                      Manage multi-tenant organizations, allocate API licenses quotas, configure dynamic UI white-labels, and manage releases.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setIsOrgOpen(true)}
+                      className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-text-secondary bg-surface border border-border-default hover:bg-surface-secondary rounded shadow-sm transition-all"
+                    >
+                      <Building className="w-4 h-4 mr-1.5" /> Add Client Group
+                    </button>
+                    <button
+                      onClick={() => setIsOpen(true)}
+                      className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded shadow-sm transition-all"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" /> Provision Tenant Hotel
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
+
+                {/* SaaS Metrics */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm">
+                    <div className="text-xxs font-bold text-text-muted uppercase tracking-wider">Monthly Recurring Revenue (MRR)</div>
+                    <div className="text-2xl font-black text-success mt-1 font-mono">${(properties.length * 2500).toLocaleString()}</div>
+                    <div className="text-[10px] text-text-muted mt-1">AWS multi-tenant contract value</div>
+                  </div>
+                  <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm">
+                    <div className="text-xxs font-bold text-text-muted uppercase tracking-wider">Active Properties</div>
+                    <div className="text-2xl font-black text-primary mt-1">{properties.length} instances</div>
+                    <div className="text-[10px] text-text-muted mt-1">{organizations.length} active groups</div>
+                  </div>
+                  <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm">
+                    <div className="text-xxs font-bold text-text-muted uppercase tracking-wider">Infrastructure SLA Uptime</div>
+                    <div className="text-2xl font-black text-indigo-500 mt-1">99.98%</div>
+                    <div className="text-[10px] text-text-muted mt-1">API gateway response health</div>
+                  </div>
+                  <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm">
+                    <div className="text-xxs font-bold text-text-muted uppercase tracking-wider">Tenant Churn Ratio</div>
+                    <div className="text-2xl font-black text-error mt-1">{stats.churnRate || "0%"}</div>
+                    <div className="text-[10px] text-text-muted mt-1">Excellent client retention index</div>
+                  </div>
+                </div>
+
+                {/* 5-Tab Control Tower Navigation */}
+                <div className="flex border-b border-border-default/60 space-x-6 pb-px mt-6 overflow-x-auto scrollbar-none">
                   <button
-                    onClick={() => setIsOrgOpen(true)}
-                    className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-text-secondary bg-surface border border-border-default hover:bg-surface-secondary rounded shadow-sm transition-all"
+                    onClick={() => setActiveTab("command")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "command"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
                   >
-                    <Building className="w-4 h-4 mr-1.5" /> Add Client Group
+                    <Activity className="w-3.5 h-3.5" /> Command Center
                   </button>
                   <button
-                    onClick={() => setIsOpen(true)}
-                    className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded shadow-sm transition-all"
+                    onClick={() => setActiveTab("clients")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "clients"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
                   >
-                    <Plus className="w-4 h-4 mr-1.5" /> Provision Tenant Hotel
+                    <Building className="w-3.5 h-3.5" /> Clients & Properties
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("licenses")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "licenses"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <KeyRound className="w-3.5 h-3.5" /> Licenses & Modules
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("ui_studio")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "ui_studio"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <Palette className="w-3.5 h-3.5" /> UI & Theme Studio
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("releases")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "releases"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" /> Release Manager
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("api_integrations")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "api_integrations"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <Wifi className="w-3.5 h-3.5" /> API & Integrations
                   </button>
                 </div>
               </div>
 
-              {/* SaaS Metrics */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm">
-                  <div className="text-xxs font-bold text-text-muted uppercase tracking-wider">Monthly Recurring Revenue (MRR)</div>
-                  <div className="text-2xl font-black text-success mt-1 font-mono">${(properties.length * 2500).toLocaleString()}</div>
-                  <div className="text-[10px] text-text-muted mt-1">AWS multi-tenant contract value</div>
-                </div>
-                <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm">
-                  <div className="text-xxs font-bold text-text-muted uppercase tracking-wider">Active Properties</div>
-                  <div className="text-2xl font-black text-primary mt-1">{properties.length} instances</div>
-                  <div className="text-[10px] text-text-muted mt-1">{organizations.length} active groups</div>
-                </div>
-                <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm">
-                  <div className="text-xxs font-bold text-text-muted uppercase tracking-wider">Infrastructure SLA Uptime</div>
-                  <div className="text-2xl font-black text-indigo-500 mt-1">99.98%</div>
-                  <div className="text-[10px] text-text-muted mt-1">API gateway response health</div>
-                </div>
-                <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm">
-                  <div className="text-xxs font-bold text-text-muted uppercase tracking-wider">Tenant Churn Ratio</div>
-                  <div className="text-2xl font-black text-error mt-1">{stats.churnRate || "0%"}</div>
-                  <div className="text-[10px] text-text-muted mt-1">Excellent client retention index</div>
-                </div>
-              </div>
-
-              {/* 5-Tab Control Tower Navigation */}
-              <div className="flex border-b border-border-default/60 space-x-6 pb-px mt-6">
-                <button
-                  onClick={() => setActiveTab("command")}
-                  className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === "command"
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  <Activity className="w-3.5 h-3.5" /> Command Center
-                </button>
-                <button
-                  onClick={() => setActiveTab("clients")}
-                  className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === "clients"
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  <Building className="w-3.5 h-3.5" /> Clients & Properties
-                </button>
-                <button
-                  onClick={() => setActiveTab("licenses")}
-                  className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === "licenses"
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  <KeyRound className="w-3.5 h-3.5" /> Licenses & Modules
-                </button>
-                <button
-                  onClick={() => setActiveTab("ui_studio")}
-                  className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === "ui_studio"
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  <Palette className="w-3.5 h-3.5" /> UI & Theme Studio
-                </button>
-                <button
-                  onClick={() => setActiveTab("releases")}
-                  className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === "releases"
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5" /> Release Manager
-                </button>
-                <button
-                  onClick={() => setActiveTab("api_integrations")}
-                  className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    activeTab === "api_integrations"
-                      ? "border-b-2 border-primary text-primary"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  <Wifi className="w-3.5 h-3.5" /> API & Integrations
-                </button>
-              </div>
-
-              {isLoading ? (
-                <div className="flex justify-center py-20">
-                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                </div>
-              ) : error ? (
-                <div className="p-4 bg-error/10 border border-error/20 rounded text-sm text-error">
-                  {error}
-                </div>
-              ) : (
-                <div className="mt-6 space-y-6">
+              {/* Scrollable Content Pane */}
+              <div className="flex-1 overflow-y-auto p-6 font-sans">
+                {isLoading ? (
+                  <div className="flex justify-center py-20">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  </div>
+                ) : error ? (
+                  <div className="p-4 bg-error/10 border border-error/20 rounded text-sm text-error">
+                    {error}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
                   
                   {/* TAB 1: COMMAND CENTER */}
                   {activeTab === "command" && (
@@ -1309,7 +1314,8 @@ export default function SuperAdminPage() {
 
                 </div>
               )}
-            </>
+              </div>
+            </div>
           </RoleProtected>
         </main>
       </div>
