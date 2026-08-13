@@ -58,6 +58,7 @@ model Property {
   uiConfigString      String?
   deploymentMode      String          @default("SaaS")
   appVersion          String          @default("2026.1")
+  enabledIntegrationsString String      @default("Stripe,BookingCom")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 }

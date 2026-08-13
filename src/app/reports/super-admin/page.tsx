@@ -14,6 +14,14 @@ import {
   deleteSaaSOrganizationAction
 } from "@/app/actions/saasAdmin";
 import {
+  getSaaSPropertyApiAndIntegrationsAction,
+  createSaaSPropertyApiKeyAction,
+  revokeSaaSPropertyApiKeyAction,
+  createSaaSPropertyWebhookAction,
+  deleteSaaSPropertyWebhookAction,
+  updateSaaSPropertyIntegrationsAction
+} from "@/app/actions/saasApi";
+import {
   ShieldCheck,
   Plus,
   RefreshCw,
@@ -44,7 +52,15 @@ export default function SuperAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases">("command");
+  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations">("command");
+
+  // Integrations & API management states
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
+  const [webhooks, setWebhooks] = useState<any[]>([]);
+  const [enabledIntegrations, setEnabledIntegrations] = useState<string[]>([]);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newWebhookUrl, setNewWebhookUrl] = useState("");
+  const [newWebhookEvents, setNewWebhookEvents] = useState("reservation.create");
 
   // Registry Form States
   const [isOpen, setIsOpen] = useState(false);
@@ -134,6 +150,123 @@ export default function SuperAdminPage() {
       }
     }
   }, [selectedPropId, properties]);
+
+  // Load API keys, webhooks, and active integrations when selected property or tab changes
+  useEffect(() => {
+    async function loadApiAndIntegrations() {
+      if (!selectedPropId) return;
+      try {
+        const res = await getSaaSPropertyApiAndIntegrationsAction(selectedPropId);
+        if (res.success && res.apiKeys && res.webhooks && res.enabledIntegrations) {
+          setApiKeys(res.apiKeys);
+          setWebhooks(res.webhooks);
+          setEnabledIntegrations(res.enabledIntegrations);
+        }
+      } catch (err) {
+        console.error("Failed to load property API keys and integrations:", err);
+      }
+    }
+
+    if (selectedPropId && (activeTab === "api_integrations" || activeTab === "licenses")) {
+      loadApiAndIntegrations();
+    }
+  }, [selectedPropId, activeTab]);
+
+  // API and webhook action triggers
+  const handleGenerateApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropId || !newKeyName) return;
+    setIsActionLoading(true);
+    try {
+      const res = await createSaaSPropertyApiKeyAction(selectedPropId, newKeyName);
+      if (res.success && res.apiKey) {
+        setNewKeyName("");
+        const updated = await getSaaSPropertyApiAndIntegrationsAction(selectedPropId);
+        if (updated.success && updated.apiKeys) setApiKeys(updated.apiKeys);
+        alert("API Key successfully generated!");
+      } else {
+        alert(res.error || "Failed to generate key.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to generate key.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRevokeApiKey = async (keyId: string) => {
+    if (!selectedPropId || !confirm("Are you sure you want to revoke this API key?")) return;
+    try {
+      const res = await revokeSaaSPropertyApiKeyAction(keyId);
+      if (res.success) {
+        const updated = await getSaaSPropertyApiAndIntegrationsAction(selectedPropId);
+        if (updated.success && updated.apiKeys) setApiKeys(updated.apiKeys);
+        alert("API key successfully revoked.");
+      } else {
+        alert(res.error || "Failed to revoke key.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    }
+  };
+
+  const handleCreateWebhook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPropId || !newWebhookUrl) return;
+    setIsActionLoading(true);
+    try {
+      const res = await createSaaSPropertyWebhookAction(selectedPropId, newWebhookUrl, newWebhookEvents);
+      if (res.success && res.webhook) {
+        setNewWebhookUrl("");
+        const updated = await getSaaSPropertyApiAndIntegrationsAction(selectedPropId);
+        if (updated.success && updated.webhooks) setWebhooks(updated.webhooks);
+        alert("Webhook subscription added successfully!");
+      } else {
+        alert(res.error || "Failed to add webhook.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to add webhook.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDeleteWebhook = async (webhookId: string) => {
+    if (!selectedPropId || !confirm("Are you sure you want to delete this webhook subscription?")) return;
+    try {
+      const res = await deleteSaaSPropertyWebhookAction(webhookId);
+      if (res.success) {
+        const updated = await getSaaSPropertyApiAndIntegrationsAction(selectedPropId);
+        if (updated.success && updated.webhooks) setWebhooks(updated.webhooks);
+        alert("Webhook subscription deleted.");
+      } else {
+        alert(res.error || "Failed to delete webhook.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    }
+  };
+
+  const handleToggleIntegration = async (integrationKey: string) => {
+    if (!selectedPropId) return;
+    let nextList = [...enabledIntegrations];
+    if (nextList.includes(integrationKey)) {
+      nextList = nextList.filter((i) => i !== integrationKey);
+    } else {
+      nextList.push(integrationKey);
+    }
+
+    try {
+      const res = await updateSaaSPropertyIntegrationsAction(selectedPropId, nextList);
+      if (res.success) {
+        setEnabledIntegrations(nextList);
+      } else {
+        alert(res.error || "Failed to toggle integration.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    }
+  };
 
   // Handle License & Modules save
   const handleSaveLicenseSettings = async () => {
@@ -442,6 +575,16 @@ export default function SuperAdminPage() {
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" /> Release Manager
+                </button>
+                <button
+                  onClick={() => setActiveTab("api_integrations")}
+                  className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === "api_integrations"
+                      ? "border-b-2 border-primary text-primary"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  <Wifi className="w-3.5 h-3.5" /> API & Integrations
                 </button>
               </div>
 
@@ -964,6 +1107,202 @@ export default function SuperAdminPage() {
                             })}
                           </tbody>
                         </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 6: API & INTEGRATIONS MARKETPLACE */}
+                  {activeTab === "api_integrations" && (
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 font-sans">
+                      {/* 1. Integrations Marketplace */}
+                      <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm space-y-4">
+                        <div className="border-b border-border-default pb-3">
+                          <h3 className="text-sm font-bold text-text-primary">Integrations Marketplace</h3>
+                          <p className="text-[10px] text-text-muted mt-1">Enable marketplace plugins and monitor third-party gateway connections.</p>
+                        </div>
+                        <div className="space-y-4">
+                          {[
+                            { key: "Stripe", name: "Stripe Payment Gateway", desc: "Process secure guest billing & cards", latency: "12ms", status: "healthy" },
+                            { key: "BookingCom", name: "Booking.com OTA Channel", desc: "Synchronize inventory distributions", latency: "45ms", status: "healthy" },
+                            { key: "Tally", name: "Tally ERP Accounting Ledger", desc: "Export settled invoices & audits", warning: "Token expires in 12 days", status: "warning" },
+                            { key: "SMS", name: "Transactional SMS Gateway", desc: "Send automated guest messaging alerts", status: "inactive" }
+                          ].map((plugin) => {
+                            const isEnabled = enabledIntegrations.includes(plugin.key);
+                            return (
+                              <div key={plugin.key} className="p-3 bg-surface-secondary/40 border border-border-default rounded-lg flex flex-col gap-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="font-bold text-xs text-text-primary">{plugin.name}</div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleIntegration(plugin.key)}
+                                    className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                      isEnabled ? "bg-primary" : "bg-slate-350 dark:bg-slate-700"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                        isEnabled ? "translate-x-3.5" : "translate-x-0"
+                                      }`}
+                                    />
+                                  </button>
+                                </div>
+                                <p className="text-[10px] text-text-secondary leading-normal">{plugin.desc}</p>
+                                {isEnabled && (
+                                  <div className="flex items-center gap-1.5 pt-1.5 border-t border-border-default/50 text-[9px] font-semibold">
+                                    {plugin.status === "healthy" && (
+                                      <>
+                                        <span className="h-1.5 w-1.5 rounded-full bg-success"></span>
+                                        <span className="text-success">Connected ({plugin.latency})</span>
+                                      </>
+                                    )}
+                                    {plugin.status === "warning" && (
+                                      <>
+                                        <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse"></span>
+                                        <span className="text-warning">{plugin.warning}</span>
+                                      </>
+                                    )}
+                                    {plugin.status === "inactive" && (
+                                      <>
+                                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+                                        <span className="text-text-muted">Enabled</span>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* 2. Developer API Keys */}
+                      <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm space-y-6">
+                        <div className="border-b border-border-default pb-3">
+                          <h3 className="text-sm font-bold text-text-primary">Developer API Keys</h3>
+                          <p className="text-[10px] text-text-muted mt-1">Generate developer credentials to interact with this property's PMS endpoints.</p>
+                        </div>
+
+                        {/* Generate Form */}
+                        <form onSubmit={handleGenerateApiKey} className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Key Label Name</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="e.g. Channel Manager Server"
+                                value={newKeyName}
+                                onChange={(e) => setNewKeyName(e.target.value)}
+                                className="flex-1 px-3 py-1.5 text-xs border border-border-default rounded bg-surface focus:outline-none focus:border-primary font-bold"
+                                required
+                              />
+                              <button
+                                type="submit"
+                                disabled={isActionLoading}
+                                className="px-3 py-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded shadow-small shrink-0"
+                              >
+                                Generate
+                              </button>
+                            </div>
+                          </div>
+                        </form>
+
+                        {/* Keys List */}
+                        <div className="space-y-3 pt-2">
+                          <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Active Credentials</label>
+                          {apiKeys.length === 0 ? (
+                            <div className="text-[10px] text-text-muted p-4 border border-dashed border-border-default rounded text-center">
+                              No credentials generated for this location.
+                            </div>
+                          ) : (
+                            <div className="divide-y divide-border-default border border-border-default rounded overflow-hidden">
+                              {apiKeys.map((key) => (
+                                <div key={key.id} className="p-3 bg-surface-secondary/20 flex items-center justify-between text-xxs">
+                                  <div className="space-y-0.5 max-w-[70%]">
+                                    <div className="font-bold text-text-primary">{key.name}</div>
+                                    <code className="text-primary font-mono block truncate select-all">{key.token}</code>
+                                  </div>
+                                  <button
+                                    onClick={() => handleRevokeApiKey(key.id)}
+                                    className="p-1 hover:bg-rose-500/10 text-text-muted hover:text-error rounded transition-all"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3. Webhook Subscriptions */}
+                      <div className="bg-surface border border-border-default rounded-lg p-5 shadow-sm space-y-6">
+                        <div className="border-b border-border-default pb-3">
+                          <h3 className="text-sm font-bold text-text-primary">Webhook Subscriptions</h3>
+                          <p className="text-[10px] text-text-muted mt-1">Configure HTTP push targets to notify your services of real-time property updates.</p>
+                        </div>
+
+                        {/* Add Webhook Form */}
+                        <form onSubmit={handleCreateWebhook} className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Target Endpoint URL</label>
+                            <input
+                              type="url"
+                              placeholder="https://my-server.com/hooks"
+                              value={newWebhookUrl}
+                              onChange={(e) => setNewWebhookUrl(e.target.value)}
+                              className="w-full px-3 py-1.5 text-xs border border-border-default rounded bg-surface focus:outline-none focus:border-primary font-mono"
+                              required
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 items-end">
+                            <div className="col-span-2 space-y-1">
+                              <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Event Trigger</label>
+                              <select
+                                value={newWebhookEvents}
+                                onChange={(e) => setNewWebhookEvents(e.target.value)}
+                                className="w-full px-2 py-1.5 text-xs border border-border-default rounded bg-surface focus:outline-none font-bold text-text-secondary"
+                              >
+                                <option value="reservation.create">reservation.create</option>
+                                <option value="guest.check_in">guest.check_in</option>
+                                <option value="folio.settle">folio.settle</option>
+                              </select>
+                            </div>
+                            <button
+                              type="submit"
+                              disabled={isActionLoading}
+                              className="w-full py-1.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded shadow-small"
+                            >
+                              Subscribe
+                            </button>
+                          </div>
+                        </form>
+
+                        {/* Webhooks List */}
+                        <div className="space-y-3 pt-2">
+                          <label className="text-[9px] font-bold text-text-muted uppercase tracking-wider block">Active Endpoints</label>
+                          {webhooks.length === 0 ? (
+                            <div className="text-[10px] text-text-muted p-4 border border-dashed border-border-default rounded text-center">
+                              No webhook endpoints configured.
+                            </div>
+                          ) : (
+                            <div className="divide-y divide-border-default border border-border-default rounded overflow-hidden">
+                              {webhooks.map((wh) => (
+                                <div key={wh.id} className="p-3 bg-surface-secondary/20 flex items-center justify-between text-xxs">
+                                  <div className="space-y-0.5 max-w-[70%]">
+                                    <div className="font-mono text-text-primary truncate select-all">{wh.targetUrl}</div>
+                                    <div className="text-[10px] text-text-muted">Trigger: <span className="font-bold text-primary">{wh.eventTypes}</span></div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleDeleteWebhook(wh.id)}
+                                    className="p-1 hover:bg-rose-500/10 text-text-muted hover:text-error rounded transition-all"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
