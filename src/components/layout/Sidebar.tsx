@@ -52,6 +52,7 @@ export default function Sidebar({ currentActive }: SidebarProps) {
   const [properties, setProperties] = useState<any[]>([]);
   const navRef = useRef<HTMLElement>(null);
   const [showOperations, setShowOperations] = useState<boolean>(false);
+  const [isSupportActive, setIsSupportActive] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -60,6 +61,18 @@ export default function Sidebar({ currentActive }: SidebarProps) {
         setShowOperations(true);
       }
     }
+  }, []);
+
+  useEffect(() => {
+    const checkSupportSession = () => {
+      if (typeof window !== "undefined") {
+        const active = sessionStorage.getItem("hotelos_support_session_active") === "true";
+        setIsSupportActive(active);
+      }
+    };
+    checkSupportSession();
+    const interval = setInterval(checkSupportSession, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   // Restore scroll state on page load
@@ -209,8 +222,8 @@ export default function Sidebar({ currentActive }: SidebarProps) {
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => {
-        // If SaaS Owner is in clean view mode, hide all operational views
-        if (currentUser?.role === "SAAS_OWNER" && !showOperations) {
+        // If SaaS Owner is in clean view mode, hide all operational views, unless support session is active!
+        if (currentUser?.role === "SAAS_OWNER" && !showOperations && !isSupportActive) {
           return item.href === "/reports/super-admin" || item.href === "/profile";
         }
         const allowedRoles = allowedRolesMap[item.href];

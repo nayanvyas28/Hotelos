@@ -97,6 +97,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Override active property if JIT break-glass support session is active
+  useEffect(() => {
+    const checkSupportSession = () => {
+      if (typeof window !== "undefined") {
+        const isSupportActive = sessionStorage.getItem("hotelos_support_session_active") === "true";
+        if (isSupportActive) {
+          const supportPropId = sessionStorage.getItem("hotelos_support_session_prop_id");
+          if (supportPropId && supportPropId !== activePropertyId) {
+            setActivePropertyId(supportPropId);
+          }
+        }
+      }
+    };
+    checkSupportSession();
+    const interval = setInterval(checkSupportSession, 1000);
+    return () => clearInterval(interval);
+  }, [activePropertyId]);
+
   const login = async (email: string, password?: string): Promise<boolean> => {
     // Enforce password check for SAAS_OWNER profile
     if (email.toLowerCase() === "owner@hotelos.com") {
