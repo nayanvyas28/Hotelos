@@ -35,6 +35,10 @@ import {
 } from "@/app/actions/saasTaxonomy";
 import { getSaaSAuditLogsAction } from "@/app/actions/saasAudit";
 import {
+  getSaaSSubscriptionsAction,
+  createSaaSInvoiceAction
+} from "@/app/actions/saasBilling";
+import {
   ShieldCheck,
   Plus,
   RefreshCw,
@@ -53,7 +57,8 @@ import {
   Terminal,
   Palette,
   HardDrive,
-  KeyRound
+  KeyRound,
+  CreditCard
 } from "lucide-react";
 
 export default function SuperAdminPage() {
@@ -65,7 +70,15 @@ export default function SuperAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations" | "broadcasts" | "taxonomy" | "audit">("command");
+  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations" | "broadcasts" | "taxonomy" | "audit" | "billing">("command");
+
+  // SaaS Billing states
+  const [billingOrgs, setBillingOrgs] = useState<any[]>([]);
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
+  const [billingAmount, setBillingAmount] = useState(2500);
+  const [billingStatus, setBillingStatus] = useState("PENDING");
+  const [billingDueDate, setBillingDueDate] = useState("");
+  const [billingSelectedOrgId, setBillingSelectedOrgId] = useState("");
 
   // Global Audit Log states
   const [globalAuditLogs, setGlobalAuditLogs] = useState<any[]>([]);
@@ -516,6 +529,51 @@ export default function SuperAdminPage() {
     }
   }, [activeTab, auditSearchQuery, auditActionType]);
 
+  // Billing Action triggers
+  const loadBillingSubscriptions = async () => {
+    try {
+      const res = await getSaaSSubscriptionsAction();
+      if (res.success && res.organizations) {
+        setBillingOrgs(res.organizations);
+      }
+    } catch (err) {
+      console.error("Failed to load billing organizations:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "billing") {
+      loadBillingSubscriptions();
+    }
+  }, [activeTab]);
+
+  const handleCreateInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!billingSelectedOrgId || !billingAmount || !billingDueDate) return;
+    setIsActionLoading(true);
+    try {
+      const res = await createSaaSInvoiceAction(
+        billingSelectedOrgId,
+        billingAmount,
+        billingStatus,
+        billingDueDate
+      );
+      if (res.success) {
+        setIsBillingModalOpen(false);
+        setBillingAmount(2500);
+        setBillingDueDate("");
+        await loadBillingSubscriptions();
+        alert("SaaS invoice generated and dispatched successfully!");
+      } else {
+        alert(res.error || "Failed to create invoice.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   // Handle License & Modules save
   const handleSaveLicenseSettings = async () => {
     if (!selectedPropId) return;
@@ -866,6 +924,16 @@ export default function SuperAdminPage() {
                     }`}
                   >
                     <ShieldCheck className="w-3.5 h-3.5" /> Security Audit Trails
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("billing")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "billing"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" /> SaaS Billing & Subscriptions
                   </button>
                 </div>
               </div>
@@ -2026,6 +2094,179 @@ export default function SuperAdminPage() {
                     </div>
                   )}
 
+                  {/* TAB 10: SAAS BILLING & SUBSCRIPTIONS */}
+                  {activeTab === "billing" && (
+                    <div className="space-y-6 font-sans">
+                      {/* Financial Metrics Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-1">
+                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Monthly Recurring Revenue (MRR)</span>
+                          <div className="text-xl font-extrabold text-primary flex items-baseline gap-1">
+                            ${billingOrgs.reduce((acc, org) => acc + (org.properties.length * 2500), 0).toLocaleString()}
+                            <span className="text-xxs font-bold text-text-muted uppercase">USD / Month</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-1">
+                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Active Licenses</span>
+                          <div className="text-xl font-extrabold text-text-primary">
+                            {billingOrgs.reduce((acc, org) => acc + org.properties.length, 0)} Properties
+                          </div>
+                        </div>
+
+                        <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-1">
+                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Outstanding Collections</span>
+                          <div className="text-xl font-extrabold text-amber-600 flex items-baseline gap-1">
+                            ${billingOrgs.reduce((acc, org) => {
+                              const pendingAmt = org.saasInvoices
+                                .filter((inv: any) => inv.status === "PENDING" || inv.status === "OVERDUE")
+                                .reduce((s: number, inv: any) => s + inv.amount, 0);
+                              return acc + pendingAmt;
+                            }, 0).toLocaleString()}
+                            <span className="text-xxs font-bold text-text-muted uppercase">USD Pending</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tenant Subscription List */}
+                      <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
+                        <div className="border-b border-border-default pb-3 flex justify-between items-center">
+                          <div>
+                            <h3 className="text-sm font-bold text-text-primary">Active Subscriber Directory</h3>
+                            <p className="text-[10px] text-text-muted mt-1">Status of client hospitality groups, active properties, and subscription plans.</p>
+                          </div>
+                        </div>
+
+                        <div className="border border-border-default rounded-lg overflow-hidden">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-surface-secondary border-b border-border-default text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                                <th className="p-3">Organization Group</th>
+                                <th className="p-3">Active Properties</th>
+                                <th className="p-3">Base Price Tier</th>
+                                <th className="p-3">Current Status</th>
+                                <th className="p-3 text-right">Billing Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-default">
+                              {billingOrgs.length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} className="p-8 text-center text-text-muted text-xs">
+                                    No subscriber groups found.
+                                  </td>
+                                </tr>
+                              ) : (
+                                billingOrgs.map((org) => {
+                                  const propertiesCount = org.properties.length;
+                                  const activeInvoices = org.saasInvoices || [];
+                                  const hasOverdue = activeInvoices.some((inv: any) => inv.status === "OVERDUE");
+                                  return (
+                                    <tr key={org.id} className="hover:bg-surface-secondary/20 transition-all">
+                                      <td className="p-3 font-semibold text-text-secondary">
+                                        {org.name}
+                                      </td>
+                                      <td className="p-3 font-bold text-text-primary">
+                                        {propertiesCount} Property ({org.properties.map((p: any) => p.name).join(", ") || "None"})
+                                      </td>
+                                      <td className="p-3 text-text-muted">
+                                        $2,500 / Property / Mo
+                                      </td>
+                                      <td className="p-3">
+                                        <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-full border transition-all ${
+                                          hasOverdue
+                                            ? "bg-rose-500/10 border-rose-500/20 text-rose-600"
+                                            : propertiesCount > 0
+                                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
+                                            : "bg-slate-100 dark:bg-slate-800 border-border-default text-text-muted"
+                                        }`}>
+                                          {hasOverdue ? "Overdue Collection" : propertiesCount > 0 ? "Active Subscription" : "No Active Properties"}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-right">
+                                        <button
+                                          onClick={() => {
+                                            setBillingSelectedOrgId(org.id);
+                                            setBillingAmount(propertiesCount * 2500 || 2500);
+                                            setIsBillingModalOpen(true);
+                                          }}
+                                          className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold rounded shadow-small transition-all flex items-center gap-1.5 ml-auto"
+                                        >
+                                          <Plus className="w-3 h-3" /> Dispatch Invoice
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Invoices Ledger Table */}
+                      <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
+                        <div>
+                          <h3 className="text-sm font-bold text-text-primary">SaaS Invoice Ledger</h3>
+                          <p className="text-[10px] text-text-muted mt-1">Full transaction registry of dispatched tenant subscription invoices.</p>
+                        </div>
+
+                        <div className="border border-border-default rounded-lg overflow-hidden shadow-xxs">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-surface-secondary border-b border-border-default text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                                <th className="p-3">Invoice Number</th>
+                                <th className="p-3">Client Group</th>
+                                <th className="p-3">Amount Due</th>
+                                <th className="p-3">Due Date</th>
+                                <th className="p-3">Collection Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-default">
+                              {billingOrgs.flatMap(o => o.saasInvoices).length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} className="p-8 text-center text-text-muted text-xs">
+                                    No invoices generated in the system.
+                                  </td>
+                                </tr>
+                              ) : (
+                                billingOrgs
+                                  .flatMap(org => (org.saasInvoices || []).map((inv: any) => ({ ...inv, orgName: org.name })))
+                                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                  .map((inv) => (
+                                    <tr key={inv.id} className="hover:bg-surface-secondary/20 transition-all">
+                                      <td className="p-3 font-mono font-bold text-primary">
+                                        {inv.invoiceNumber}
+                                      </td>
+                                      <td className="p-3 font-semibold text-text-secondary">
+                                        {inv.orgName}
+                                      </td>
+                                      <td className="p-3 font-bold text-text-primary">
+                                        ${inv.amount.toLocaleString()} USD
+                                      </td>
+                                      <td className="p-3 text-text-muted">
+                                        {new Date(inv.dueDate).toLocaleDateString()}
+                                      </td>
+                                      <td className="p-3">
+                                        <span className={`px-2.5 py-0.5 text-[9px] font-bold uppercase rounded-full border transition-all ${
+                                          inv.status === "PAID"
+                                            ? "bg-success/10 border-success/20 text-success"
+                                            : inv.status === "OVERDUE"
+                                            ? "bg-rose-500/10 border-rose-500/20 text-rose-600"
+                                            : "bg-amber-500/10 border-amber-500/20 text-amber-600"
+                                        }`}>
+                                          {inv.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )}
               </div>
@@ -2192,6 +2433,76 @@ export default function SuperAdminPage() {
                   className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded shadow-small"
                 >
                   {isActionLoading ? "Starting Session..." : "Initialize Session"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SaaS Billing Invoice Generation Modal */}
+      {isBillingModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="bg-surface border border-border-default rounded-lg w-full max-w-md p-6 shadow-2xl animate-zoom-in space-y-4">
+            <h3 className="text-sm font-bold text-text-primary">Dispatch SaaS subscription statement</h3>
+            <form onSubmit={handleCreateInvoice} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Target Client Group</label>
+                <div className="px-3 py-2 border border-border-default rounded bg-surface-secondary text-xs font-bold text-text-primary">
+                  {billingOrgs.find((o) => o.id === billingSelectedOrgId)?.name || "Select Client Organization"}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Billing Amount (USD)</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 2500"
+                  value={billingAmount}
+                  onChange={(e) => setBillingAmount(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Due Date</label>
+                <input
+                  type="date"
+                  value={billingDueDate}
+                  onChange={(e) => setBillingDueDate(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Collection Status</label>
+                <select
+                  value={billingStatus}
+                  onChange={(e) => setBillingStatus(e.target.value)}
+                  className="w-full text-xs font-semibold px-3 py-2 border border-border-default rounded bg-surface text-text-primary focus:outline-none"
+                >
+                  <option value="PENDING">Pending Collection (Unpaid)</option>
+                  <option value="PAID">Paid Settlement</option>
+                  <option value="OVERDUE">Overdue Claim</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBillingModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-text-secondary border border-border-default hover:bg-surface-secondary rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isActionLoading}
+                  className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded shadow-small"
+                >
+                  {isActionLoading ? "Dispatching..." : "Publish Invoice"}
                 </button>
               </div>
             </form>

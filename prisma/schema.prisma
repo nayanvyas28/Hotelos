@@ -12,12 +12,13 @@ datasource db {
 
 // 1. Tenant Models
 model Organization {
-  id          String     @id @default(uuid())
-  name        String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  properties  Property[]
-  users       User[]
+  id           String        @id @default(uuid())
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  properties   Property[]
+  users        User[]
+  saasInvoices SaasInvoice[]
 }
 
 model Property {
@@ -612,4 +613,15 @@ model GlobalTaxonomy {
   code      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+model SaasInvoice {
+  id             String       @id @default(uuid())
+  invoiceNumber  String       @unique
+  amount         Float
+  status         String       @default("PAID") // PAID, OVERDUE, PENDING
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  dueDate        DateTime
+  createdAt      DateTime     @default(now())
 }
