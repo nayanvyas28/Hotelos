@@ -53,6 +53,11 @@ model Property {
   webhooks       WebhookSubscription[]
   apiKeys        ApiKey[]
   groqApiKey     String?
+  planString          String          @default("Starter")
+  activeModulesString String          @default("PMS,Housekeeping")
+  uiConfigString      String?
+  deploymentMode      String          @default("SaaS")
+  appVersion          String          @default("2026.1")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 }

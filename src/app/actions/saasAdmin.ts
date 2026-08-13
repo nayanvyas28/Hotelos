@@ -70,6 +70,11 @@ export async function updateSaaSPropertyAction(
     timezone?: string;
     organizationId?: string;
     groqApiKey?: string;
+    planString?: string;
+    activeModulesString?: string;
+    uiConfigString?: string;
+    deploymentMode?: string;
+    appVersion?: string;
   }
 ) {
   try {

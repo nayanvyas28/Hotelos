@@ -88,6 +88,22 @@ export default function Sidebar({ currentActive }: SidebarProps) {
     fetchProperties();
   }, []);
 
+  const activeProperty = properties.find((p) => p.id === activePropertyId);
+  let primaryColor = "#0F766E";
+  let accentColor = "#D4AF37";
+  let brandName = "HotelOS";
+
+  if (activeProperty?.uiConfigString) {
+    try {
+      const parsed = JSON.parse(activeProperty.uiConfigString);
+      if (parsed.primaryColor) primaryColor = parsed.primaryColor;
+      if (parsed.accentColor) accentColor = parsed.accentColor;
+      if (parsed.brandName) brandName = parsed.brandName;
+    } catch (e) {
+      // fallback
+    }
+  }
+
   const allowedRolesMap: Record<string, StaffRole[]> = {
     "/reports": ["MD", "CFO", "GM"],
     "/reports/audit": ["MD", "GM"],
@@ -208,11 +224,14 @@ export default function Sidebar({ currentActive }: SidebarProps) {
       {/* Brand Header */}
       <div className="p-6 border-b border-border-default space-y-4">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
+          <div
+            style={{ backgroundColor: primaryColor }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-primary/20"
+          >
             <Hotel className="w-5 h-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-base tracking-tight text-text-primary leading-none">HotelOS</span>
+            <span className="font-bold text-base tracking-tight text-text-primary leading-none">{brandName}</span>
             <span className="text-[10px] font-semibold text-text-muted mt-1 uppercase tracking-wider">Enterprise HQ</span>
           </div>
         </div>
@@ -278,18 +297,28 @@ export default function Sidebar({ currentActive }: SidebarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    style={
+                      active
+                        ? {
+                            color: primaryColor,
+                            borderLeftColor: primaryColor,
+                            backgroundColor: `${primaryColor}10`,
+                          }
+                        : undefined
+                    }
                     className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 group relative ${
                       active
-                        ? "text-primary bg-primary/10 dark:bg-primary/20 shadow-sm border-l-[3px] border-primary pl-2.5"
+                        ? "shadow-sm border-l-[3px] pl-2.5 text-primary"
                         : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
                     }`}
                   >
                     <Icon
+                      style={active ? { color: primaryColor } : undefined}
                       className={`w-4.5 h-4.5 transition-transform duration-200 group-hover:scale-110 ${
                         active ? "text-primary" : "text-text-muted group-hover:text-text-primary"
                       }`}
                     />
-                    <span>{item.label}</span>
+                    <span className="flex-1">{item.label}</span>
                   </Link>
                 );
               })}
