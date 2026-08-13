@@ -33,6 +33,7 @@ import {
   updateSaaSTaxonomyItemAction,
   deleteSaaSTaxonomyItemAction
 } from "@/app/actions/saasTaxonomy";
+import { getSaaSAuditLogsAction } from "@/app/actions/saasAudit";
 import {
   ShieldCheck,
   Plus,
@@ -64,7 +65,12 @@ export default function SuperAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations" | "broadcasts" | "taxonomy">("command");
+  const [activeTab, setActiveTab] = useState<"command" | "clients" | "licenses" | "ui_studio" | "releases" | "api_integrations" | "broadcasts" | "taxonomy" | "audit">("command");
+
+  // Global Audit Log states
+  const [globalAuditLogs, setGlobalAuditLogs] = useState<any[]>([]);
+  const [auditSearchQuery, setAuditSearchQuery] = useState("");
+  const [auditActionType, setAuditActionType] = useState("");
 
   // Support Simulator & Broadcast states
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -492,6 +498,24 @@ export default function SuperAdminPage() {
     }
   };
 
+  // Audit Log triggers
+  const loadGlobalAuditLogs = async () => {
+    try {
+      const res = await getSaaSAuditLogsAction(auditSearchQuery, auditActionType);
+      if (res.success && res.logs) {
+        setGlobalAuditLogs(res.logs);
+      }
+    } catch (err) {
+      console.error("Failed to load audit logs:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "audit") {
+      loadGlobalAuditLogs();
+    }
+  }, [activeTab, auditSearchQuery, auditActionType]);
+
   // Handle License & Modules save
   const handleSaveLicenseSettings = async () => {
     if (!selectedPropId) return;
@@ -832,6 +856,16 @@ export default function SuperAdminPage() {
                     }`}
                   >
                     <HardDrive className="w-3.5 h-3.5" /> Master Data & Taxonomy
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("audit")}
+                    className={`pb-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      activeTab === "audit"
+                        ? "border-b-2 border-primary text-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" /> Security Audit Trails
                   </button>
                 </div>
               </div>
@@ -1888,6 +1922,98 @@ export default function SuperAdminPage() {
                                             <Trash2 className="w-3.5 h-3.5" />
                                           </button>
                                         </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 9: SECURITY AUDIT TRAILS */}
+                  {activeTab === "audit" && (
+                    <div className="space-y-4 font-sans">
+                      <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                          <div>
+                            <h3 className="text-sm font-bold text-text-primary">Super Admin Activity Audit</h3>
+                            <p className="text-[10px] text-text-muted mt-1">Review all administrative security updates, JIT support logins, and provisioning logs.</p>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-60 md:flex-none">
+                              <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-text-muted" />
+                              <input
+                                type="text"
+                                placeholder="Search by operator email or details..."
+                                value={auditSearchQuery}
+                                onChange={(e) => setAuditSearchQuery(e.target.value)}
+                                className="w-full pl-8 pr-3 py-1.5 border border-border-default rounded bg-surface text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary transition-all font-bold"
+                              />
+                            </div>
+                            
+                            <select
+                              value={auditActionType}
+                              onChange={(e) => setAuditActionType(e.target.value)}
+                              className="text-xs font-bold px-3 py-2 border border-border-default rounded bg-surface text-text-primary focus:outline-none"
+                            >
+                              <option value="">All Action Types</option>
+                              <option value="SUPPORT_ACCESS_START">Support Sessions (Break-glass)</option>
+                              <option value="PROVISION_PROPERTY">Property Provisioning</option>
+                              <option value="LICENSE_CHANGE">License Upgrades</option>
+                              <option value="SYNC_SCHEMA">Database Schema Syncs</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="border border-border-default rounded-lg overflow-hidden shadow-xxs">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-surface-secondary border-b border-border-default text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                                <th className="p-3">Timestamp</th>
+                                <th className="p-3">Operator</th>
+                                <th className="p-3">Security Action</th>
+                                <th className="p-3">Property Scope</th>
+                                <th className="p-3">Description Details</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-default">
+                              {globalAuditLogs.length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} className="p-8 text-center text-text-muted text-xs">
+                                    No administrative audit logs found matching criteria.
+                                  </td>
+                                </tr>
+                              ) : (
+                                globalAuditLogs.map((log) => {
+                                  const actionStyles: Record<string, string> = {
+                                    SUPPORT_ACCESS_START: "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400",
+                                    PROVISION_PROPERTY: "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400",
+                                    LICENSE_CHANGE: "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400",
+                                    SYNC_SCHEMA: "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400",
+                                  };
+                                  return (
+                                    <tr key={log.id} className="hover:bg-surface-secondary/20 transition-all">
+                                      <td className="p-3 text-text-muted whitespace-nowrap">
+                                        {new Date(log.createdAt).toLocaleString()}
+                                      </td>
+                                      <td className="p-3 font-semibold text-text-secondary">
+                                        {log.performedBy}
+                                      </td>
+                                      <td className="p-3">
+                                        <span className={`px-2 py-0.5 border text-[9px] font-bold uppercase rounded-full tracking-wider ${actionStyles[log.action] || "bg-slate-100 border-border-default text-text-muted"}`}>
+                                          {log.action}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 font-bold text-text-primary">
+                                        {log.property?.name || "Global Scope"}
+                                      </td>
+                                      <td className="p-3 text-text-muted leading-normal font-semibold">
+                                        {log.details}
                                       </td>
                                     </tr>
                                   );
