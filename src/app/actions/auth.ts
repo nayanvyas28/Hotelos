@@ -36,7 +36,7 @@ export async function authenticateUserAction(email: string) {
         name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email.split("@")[0],
         email: user.email,
         role: roleName,
-        scope: roleName === "MD" || roleName === "CFO" ? "GLOBAL" : "PROPERTY",
+        scope: roleName === "SAAS_OWNER" || roleName === "MD" || roleName === "CFO" ? "GLOBAL" : "PROPERTY",
         propertyId: property?.id || undefined,
       },
     };
