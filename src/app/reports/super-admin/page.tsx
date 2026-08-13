@@ -1345,7 +1345,28 @@ export default function SuperAdminPage() {
                   {/* TAB 4: UI & THEME STUDIO */}
                   {activeTab === "ui_studio" && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
-                      {/* Left: Brand Color Customizations */}
+                      {/* Left: Properties Selector */}
+                      <div className="bg-surface border border-border-default rounded-lg shadow-sm overflow-hidden flex flex-col max-h-[70vh]">
+                        <div className="bg-surface-secondary border-b border-border-default p-3 flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Select Property</span>
+                        </div>
+                        <div className="divide-y divide-border-default overflow-y-auto">
+                          {properties.map((prop) => (
+                            <button
+                              key={prop.id}
+                              onClick={() => setSelectedPropId(prop.id)}
+                              className={`w-full text-left p-3 hover:bg-surface-secondary/40 transition-all flex flex-col gap-1 ${
+                                selectedPropId === prop.id ? "bg-primary/5 border-l-2 border-primary" : ""
+                              }`}
+                            >
+                              <span className="font-semibold text-text-primary text-xs">{prop.name}</span>
+                              <span className="text-[10px] text-text-muted">{prop.organization?.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Middle: Brand Color Customizations */}
                       <div className="space-y-4">
                         <h3 className="text-sm font-bold text-text-primary">Customize Brand Identity</h3>
                         <div className="bg-surface border border-border-default rounded-lg p-6 shadow-sm space-y-4">
@@ -1406,7 +1427,7 @@ export default function SuperAdminPage() {
                       </div>
 
                       {/* Right: Live Preview Box */}
-                      <div className="lg:col-span-2 space-y-4">
+                      <div className="space-y-4">
                         <h3 className="text-sm font-bold text-text-primary">Live Workspace White-Label Preview</h3>
                         <div className="bg-surface-secondary border border-border-default rounded-lg p-6 shadow-sm flex justify-center items-center min-h-[40vh]">
                           {/* Mini Mock Sidebar */}
