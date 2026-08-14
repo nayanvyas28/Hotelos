@@ -5,10 +5,32 @@ import { db } from "@/lib/db";
 export async function getSaaSOverviewAction() {
   try {
     const properties = await db.property.findMany({
-      include: { organization: true },
+      include: { 
+        organization: {
+          include: {
+            users: {
+              include: {
+                userRoles: {
+                  include: { role: true }
+                }
+              }
+            }
+          }
+        } 
+      },
     });
 
-    const organizations = await db.organization.findMany();
+    const organizations = await db.organization.findMany({
+      include: {
+        users: {
+          include: {
+            userRoles: {
+              include: { role: true }
+            }
+          }
+        }
+      }
+    });
 
     // Mock SaaS stats
     const stats = {
@@ -153,12 +175,94 @@ export async function deleteSaaSPropertyAction(propertyId: string) {
   }
 }
 
-export async function createSaaSOrganizationAction(name: string) {
+export async function createSaaSOrganizationAction(
+  name: string,
+  ownerEmail?: string,
+  maxProperties?: number,
+  password?: string,
+  dbUrl?: string,
+  customDomain?: string
+) {
+  if (!name || name.trim() === "") {
+    return { success: false, error: "Organization name is required." };
+  }
+
+  const sanitizedName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const targetEmail = ownerEmail && ownerEmail.includes("@")
+    ? ownerEmail.trim().toLowerCase()
+    : `admin.${sanitizedName}@hotelos.com`;
+
   try {
-    const org = await db.organization.create({
-      data: { name },
+    // 1. Find or create MD Role record
+    let mdRole = await db.role.findUnique({
+      where: { name: "MD" },
     });
+    if (!mdRole) {
+      mdRole = await db.role.create({
+        data: {
+          name: "MD",
+          description: "Managing Director (Organization Owner)",
+        },
+      });
+    }
+
+    // 2. Create Organization
+    const org = await db.organization.create({
+      data: {
+        name: name.trim(),
+        maxProperties: Number(maxProperties || 3),
+        dbUrl: dbUrl || "",
+        customDomain: customDomain || "",
+      },
+    });
+
+    // 3. Create MD User Account
+    const emailLower = targetEmail;
+    const userRecord = await db.user.create({
+      data: {
+        email: emailLower,
+        password: password || "",
+        firstName: "Organization",
+        lastName: "Administrator",
+        organizationId: org.id,
+      },
+    });
+
+    // Link MD User to Role
+    await db.userRole.create({
+      data: {
+        userId: userRecord.id,
+        roleId: mdRole.id,
+      },
+    });
+
     return { success: true, organization: org };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateSaaSOrganizationLimitsAction(
+  organizationId: string,
+  maxProperties: number,
+  dbUrl?: string,
+  customDomain?: string
+) {
+  if (!organizationId) {
+    return { success: false, error: "Organization ID is required." };
+  }
+
+  try {
+    const updated = await db.organization.update({
+      where: { id: organizationId },
+      data: {
+        maxProperties: Number(maxProperties),
+        dbUrl: dbUrl ?? undefined,
+        customDomain: customDomain ?? undefined,
+      },
+    });
+
+    return { success: true, organization: updated };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -311,6 +415,167 @@ export async function updateSaaSPropertyOwnerAction(
         performedBy: "owner@hotelos.com",
         details: `Updated tenant organization owner credentials to email: ${emailLower}.`,
       },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getSaaSOrgOwnerAction(orgId: string) {
+  if (!orgId) return { success: false, error: "Organization ID is required." };
+
+  try {
+    const org = await db.organization.findUnique({
+      where: { id: orgId },
+      include: {
+        users: {
+          where: {
+            userRoles: {
+              some: {
+                role: { name: "MD" },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const mdUser = org?.users[0];
+    return {
+      success: true,
+      ownerEmail: mdUser?.email || "",
+      ownerPassword: mdUser?.password || "",
+    };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateSaaSOrgOwnerAction(
+  orgId: string,
+  email: string,
+  password?: string
+) {
+  if (!orgId || !email) {
+    return { success: false, error: "Organization ID and Owner Email are required." };
+  }
+
+  try {
+    // Find MD Role
+    let mdRole = await db.role.findUnique({
+      where: { name: "MD" },
+    });
+    if (!mdRole) {
+      mdRole = await db.role.create({
+        data: {
+          name: "MD",
+          description: "Managing Director (Organization Owner)",
+        },
+      });
+    }
+
+    const emailLower = email.trim().toLowerCase();
+
+    // Look for existing MD user in this organization
+    const existingMd = await db.user.findFirst({
+      where: {
+        organizationId: orgId,
+        userRoles: {
+          some: {
+            role: { name: "MD" },
+          },
+        },
+      },
+    });
+
+    if (existingMd) {
+      const updated = await db.user.update({
+        where: { id: existingMd.id },
+        data: {
+          email: emailLower,
+          password: password ?? existingMd.password,
+        },
+      });
+      return { success: true, user: updated };
+    } else {
+      // Create new MD user for this organization
+      const newUser = await db.user.create({
+        data: {
+          email: emailLower,
+          password: password || "",
+          firstName: "Organization",
+          lastName: "Administrator",
+          organizationId: orgId,
+        },
+      });
+
+      await db.userRole.create({
+        data: {
+          userId: newUser.id,
+          roleId: mdRole.id,
+        },
+      });
+
+      return { success: true, user: newUser };
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateSaaSOrganizationLicensesAction(
+  orgId: string,
+  data: {
+    planString?: string;
+    deploymentMode?: string;
+    activeModulesString?: string;
+  }
+) {
+  if (!orgId) return { success: false, error: "Organization ID is required." };
+
+  try {
+    // Update all properties belonging to this organization
+    await db.property.updateMany({
+      where: { organizationId: orgId },
+      data,
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateSaaSOrganizationUiConfigAction(
+  orgId: string,
+  uiConfigString: string
+) {
+  if (!orgId) return { success: false, error: "Organization ID is required." };
+
+  try {
+    await db.property.updateMany({
+      where: { organizationId: orgId },
+      data: { uiConfigString },
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function upgradeSaaSOrganizationVersionAction(
+  orgId: string,
+  targetVersion: string
+) {
+  if (!orgId) return { success: false, error: "Organization ID is required." };
+
+  try {
+    await db.property.updateMany({
+      where: { organizationId: orgId },
+      data: { appVersion: targetVersion },
     });
 
     return { success: true };

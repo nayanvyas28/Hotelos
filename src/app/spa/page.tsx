@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getPropertiesAction } from "@/app/actions/property";
+import { useSession } from "@/context/SessionContext";
 import {
   getSpaOverviewAction,
   createSpaServiceAction,
@@ -18,6 +19,7 @@ import HeaderStaffSwitcher from "@/components/layout/HeaderStaffSwitcher";
 import RoleProtected from "@/components/layout/RoleProtected";
 
 export default function SpaWellnessPage() {
+  const { currentUser } = useSession();
   const [properties, setProperties] = useState<any[]>([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState("");
 
@@ -64,9 +66,11 @@ export default function SpaWellnessPage() {
   // Load properties on mount
   useEffect(() => {
     async function loadProperties() {
+      if (!currentUser) return;
       setIsLoading(true);
       try {
-        const res = await getPropertiesAction();
+        const orgId = currentUser.role === "SAAS_OWNER" ? undefined : currentUser.organizationId;
+        const res = await getPropertiesAction(orgId);
         if (res.success && res.properties.length > 0) {
           setProperties(res.properties);
           setSelectedPropertyId(res.properties[0].id);
@@ -80,7 +84,7 @@ export default function SpaWellnessPage() {
       }
     }
     loadProperties();
-  }, []);
+  }, [currentUser]);
 
   // Fetch Spa data
   const loadSpaData = async () => {

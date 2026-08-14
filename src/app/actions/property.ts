@@ -160,9 +160,34 @@ export async function setupRoomsAction(
   }
 }
 
-export async function getPropertiesAction() {
+export async function getPropertiesAction(organizationId?: string) {
   try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const cookieOrgId = cookieStore.get("hotelos_org_id")?.value;
+    const cookieRole = cookieStore.get("hotelos_role")?.value;
+    const cookiePropId = cookieStore.get("hotelos_prop_id")?.value;
+
+    const finalOrgId = cookieRole === "SAAS_OWNER"
+      ? organizationId
+      : (organizationId || cookieOrgId);
+
+    if (cookieRole !== "SAAS_OWNER" && !finalOrgId) {
+      return { success: true, properties: [] };
+    }
+
+    // Location-scoped roles (GM, Front Desk, Housekeeper, Spa, etc.) should ONLY see their assigned property
+    const isGlobalRole = cookieRole === "SAAS_OWNER" || cookieRole === "MD" || cookieRole === "CFO";
+
+    let where: any = {};
+    if (!isGlobalRole && cookiePropId) {
+      where = { id: cookiePropId };
+    } else if (finalOrgId) {
+      where = { organizationId: finalOrgId };
+    }
+
     const properties = await db.property.findMany({
+      where,
       orderBy: { createdAt: "desc" },
     });
     return { success: true, properties };
@@ -181,3 +206,284 @@ export async function getPropertiesAction() {
     throw new Error(error.message || "Failed to fetch properties.");
   }
 }
+
+/**
+ * Exposes a client-side property creator for the MD (Organization Owner).
+ * Enforces max properties limit set on the Organization.
+ */
+export async function createPropertyByOwnerAction(
+  name: string,
+  address: string,
+  organizationId: string
+) {
+  if (!name || name.trim() === "") {
+    throw new Error("Property name is required.");
+  }
+  if (!organizationId) {
+    throw new Error("Organization ID is required.");
+  }
+
+  try {
+    // 1. Get organization and count current properties
+    const org = await db.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        _count: {
+          select: { properties: true },
+        },
+      },
+    });
+
+    if (!org) {
+      throw new Error("Organization not found.");
+    }
+
+    if (org._count.properties >= org.maxProperties) {
+      throw new Error(
+        `Hotel creation limit reached! Your current subscription plan only allows registering up to ${org.maxProperties} properties.`
+      );
+    }
+
+    // 2. Create the property
+    const prop = await db.property.create({
+      data: {
+        name: name.trim(),
+        address: address?.trim() || "",
+        organizationId: org.id,
+      },
+    });
+
+    // 3. Auto-generate GM user template for that hotel property
+    const sanitizedProp = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const gmEmail = `gm.${sanitizedProp}@hotelos.com`;
+
+    let gmRole = await db.role.findUnique({
+      where: { name: "GM" },
+    });
+    if (!gmRole) {
+      gmRole = await db.role.create({
+        data: {
+          name: "GM",
+          description: "General Manager (Hotel Operations Owner)",
+        },
+      });
+    }
+
+    let gmUser = await db.user.findUnique({
+      where: { email: gmEmail },
+    });
+
+    if (!gmUser) {
+      gmUser = await db.user.create({
+        data: {
+          email: gmEmail,
+          firstName: "General",
+          lastName: "Manager",
+          organizationId: org.id,
+        },
+      });
+
+      await db.userRole.create({
+        data: {
+          userId: gmUser.id,
+          roleId: gmRole.id,
+        },
+      });
+    }
+
+    // 4. Audit Log record
+    await db.auditLog.create({
+      data: {
+        propertyId: prop.id,
+        action: "PROVISION_PROPERTY",
+        performedBy: gmEmail,
+        details: `Successfully registered hotel property ${name} by Organization Owner.`,
+      },
+    });
+
+    return { success: true, property: prop };
+  } catch (error: any) {
+    console.error("Failed to create property by Owner:", error);
+    throw new Error(error.message || "Failed to create property.");
+  }
+}
+
+export async function registerOrganizationStaffAction(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password?: string;
+  roleName: string;
+  organizationId: string;
+  propertyId?: string;
+}) {
+  if (!data.email || !data.roleName || !data.organizationId) {
+    throw new Error("Email, Role, and Organization ID are required.");
+  }
+
+  try {
+    // 1. Find or create Role record
+    let role = await db.role.findUnique({
+      where: { name: data.roleName },
+    });
+    if (!role) {
+      role = await db.role.create({
+        data: {
+          name: data.roleName,
+          description: `${data.roleName} Staff Role`,
+        },
+      });
+    }
+
+    // 2. Create User account
+    const user = await db.user.create({
+      data: {
+        email: data.email.trim().toLowerCase(),
+        password: data.password || "",
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        organizationId: data.organizationId,
+        propertyId: data.propertyId || null,
+      },
+    });
+
+    // 3. Link User to Role
+    await db.userRole.create({
+      data: {
+        userId: user.id,
+        roleId: role.id,
+      },
+    });
+
+    return { success: true, user };
+  } catch (error: any) {
+    console.error("Failed to register staff member:", error);
+    throw new Error(error.message || "Failed to register staff member.");
+  }
+}
+
+/**
+ * Fetches all rooms, room types, and floors for a property.
+ */
+export async function getPropertyRoomDetailsAction(propertyId: string) {
+  if (!propertyId) {
+    return { success: true, rooms: [], roomTypes: [], floors: [] };
+  }
+
+  try {
+    const [rooms, roomTypes, floors] = await Promise.all([
+      db.room.findMany({
+        where: { propertyId },
+        include: {
+          floor: { select: { name: true, number: true } },
+          roomType: { select: { name: true, code: true, basePrice: true } },
+        },
+        orderBy: { number: "asc" },
+      }),
+      db.roomType.findMany({
+        where: { propertyId },
+        orderBy: { name: "asc" },
+      }),
+      db.floor.findMany({
+        where: { propertyId },
+        orderBy: { number: "asc" },
+      }),
+    ]);
+
+    return { success: true, rooms, roomTypes, floors };
+  } catch (error: any) {
+    console.error("Failed to fetch property room details:", error);
+    return { success: false, rooms: [], roomTypes: [], floors: [] };
+  }
+}
+
+/**
+ * Creates a single room.
+ */
+export async function createSingleRoomAction(data: {
+  propertyId: string;
+  number: string;
+  floorId: string;
+  roomTypeId: string;
+}) {
+  if (!data.propertyId || !data.number || !data.floorId || !data.roomTypeId) {
+    throw new Error("Property ID, Room Number, Floor, and Room Type are required.");
+  }
+
+  try {
+    const room = await db.room.create({
+      data: {
+        propertyId: data.propertyId,
+        number: data.number.trim(),
+        floorId: data.floorId,
+        roomTypeId: data.roomTypeId,
+        status: "AVAILABLE",
+      },
+    });
+    return { success: true, room };
+  } catch (error: any) {
+    console.error("Failed to create room:", error);
+    throw new Error(error.message || "Failed to create room.");
+  }
+}
+
+/**
+ * Creates a single room type.
+ */
+export async function createSingleRoomTypeAction(data: {
+  propertyId: string;
+  name: string;
+  code: string;
+  basePrice: number;
+  capacity?: number;
+  beds?: number;
+}) {
+  if (!data.propertyId || !data.name || !data.code || !data.basePrice) {
+    throw new Error("Property ID, Room Type Name, Code, and Base Price are required.");
+  }
+
+  try {
+    const roomType = await db.roomType.create({
+      data: {
+        propertyId: data.propertyId,
+        name: data.name.trim(),
+        code: data.code.trim().toUpperCase(),
+        basePrice: Number(data.basePrice),
+        capacity: Number(data.capacity || 2),
+        beds: Number(data.beds || 1),
+      },
+    });
+    return { success: true, roomType };
+  } catch (error: any) {
+    console.error("Failed to create room type:", error);
+    throw new Error(error.message || "Failed to create room type.");
+  }
+}
+
+/**
+ * Creates a single floor.
+ */
+export async function createSingleFloorAction(data: {
+  propertyId: string;
+  number: number;
+  name?: string;
+}) {
+  if (!data.propertyId || data.number === undefined) {
+    throw new Error("Property ID and Floor Number are required.");
+  }
+
+  try {
+    const floor = await db.floor.create({
+      data: {
+        propertyId: data.propertyId,
+        number: Number(data.number),
+        name: data.name?.trim() || `Floor ${data.number}`,
+      },
+    });
+    return { success: true, floor };
+  } catch (error: any) {
+    console.error("Failed to create floor:", error);
+    throw new Error(error.message || "Failed to create floor.");
+  }
+}
+

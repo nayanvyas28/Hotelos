@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, MOCK_STAFF_DIRECTORY, UserProfile } from "@/context/SessionContext";
-import { KeyRound, Shield, HelpCircle, ArrowRight, Building2, Hotel } from "lucide-react";
+import { KeyRound, Shield, HelpCircle, ArrowRight, Building2, Hotel, X, Sparkles, CheckCircle2, Lock } from "lucide-react";
+import { createPasswordResetApprovalAction } from "@/app/actions/approvals";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,12 +13,21 @@ export default function LoginPage() {
   const [passwordInput, setPasswordInput] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Forgot Password modal state
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetRole, setResetRole] = useState("MD");
+  const [resetReason, setResetReason] = useState("");
+  const [isSubmittingReset, setIsSubmittingReset] = useState(false);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
+  const [resetErrorMsg, setResetErrorMsg] = useState<string | null>(null);
+
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!emailInput) return;
     const success = await login(emailInput, passwordInput);
     if (!success) {
-      setErrorMsg("Invalid credentials. Try Rajesh's email, or the owner email with correct password.");
+      setErrorMsg("Invalid credentials. Try director@hotelos.com or the SaaS owner email (NayanOS#2026).");
     } else {
       setErrorMsg(null);
       router.push("/");
@@ -28,6 +38,32 @@ export default function LoginPage() {
     const success = await login(email);
     if (success) {
       router.push("/");
+    }
+  };
+
+  const handleRequestPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+
+    setIsSubmittingReset(true);
+    setResetSuccessMsg(null);
+    setResetErrorMsg(null);
+
+    try {
+      let dept = "CORPORATE";
+      if (resetRole === "FRONT_DESK") dept = "FRONT_OFFICE";
+      if (resetRole === "HOUSEKEEPER") dept = "HOUSEKEEPING";
+
+      const res = await createPasswordResetApprovalAction(resetEmail, resetRole, dept);
+      if (res.success) {
+        setResetSuccessMsg(res.message || "Password reset request submitted successfully to Parent Admin for approval!");
+      } else {
+        setResetErrorMsg(res.error || "Failed to submit password reset request.");
+      }
+    } catch (err: any) {
+      setResetErrorMsg(err.message || "An unexpected error occurred.");
+    } finally {
+      setIsSubmittingReset(false);
     }
   };
 
@@ -61,8 +97,8 @@ export default function LoginPage() {
           <div className="flex items-center space-x-4 border-t border-slate-800 pt-6">
             <Shield className="w-6 h-6 text-primary shrink-0" />
             <div className="text-xs text-slate-400">
-              <span className="font-bold text-white block">Strict Audit Enforcement</span>
-              All actions are recorded in the global Night Audit log ledger under compliance standards.
+              <span className="font-bold text-white block">Hierarchical Admin Approval Engine</span>
+              Password resets & department requests route to your Parent Admin (GM, HK Manager, or SaaS Owner) for verification.
             </div>
           </div>
         </div>
@@ -115,16 +151,30 @@ export default function LoginPage() {
               <label className="text-xs font-bold text-slate-300">Corporate Email</label>
               <input
                 type="email"
-                placeholder="e.g. director@hotelos.com"
+                placeholder="e.g. director@hotelos.com or radisson@hotelos.com"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-slate-600"
+                className="w-full px-3 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary transition-all placeholder:text-slate-600 font-medium"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-300">Access Password</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-300">Access Password</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetEmail(emailInput || "");
+                    setResetSuccessMsg(null);
+                    setResetErrorMsg(null);
+                    setIsForgotModalOpen(true);
+                  }}
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1 transition-all"
+                >
+                  <Lock className="w-3 h-3" /> Forgot Password?
+                </button>
+              </div>
               <input
                 type="password"
                 placeholder="••••••••"
@@ -134,7 +184,7 @@ export default function LoginPage() {
               />
             </div>
 
-            {errorMsg && <p className="text-xs text-error font-medium">{errorMsg}</p>}
+            {errorMsg && <p className="text-xs text-rose-400 font-medium bg-rose-500/10 border border-rose-500/20 p-2 rounded">{errorMsg}</p>}
 
             <button
               type="submit"
@@ -147,6 +197,100 @@ export default function LoginPage() {
         </div>
 
       </div>
+
+      {/* FORGOT PASSWORD MODAL */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2 text-primary">
+                <KeyRound className="w-5 h-5 text-primary" />
+                <h3 className="text-base font-extrabold text-white">Password Recovery & Reset</h3>
+              </div>
+              <button
+                onClick={() => setIsForgotModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Forgotten your login email or password? Enter your corporate email below. Your reset request will be routed directly to your <strong className="text-primary">Parent Admin (GM, Housekeeper Manager, or SaaS Platform Owner)</strong> for instant approval in the Governance Engine.
+            </p>
+
+            <form onSubmit={handleRequestPasswordReset} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">Registered Corporate Email</label>
+                <input
+                  type="email"
+                  placeholder="e.g. director@hotelos.com or radisson@hotelos.com"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">Department / Role Category</label>
+                <select
+                  value={resetRole}
+                  onChange={(e) => setResetRole(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-bold"
+                >
+                  <option value="MD">Managing Director / Corporate HQ (Approver: SaaS Owner)</option>
+                  <option value="GM">General Manager (Approver: SaaS Owner)</option>
+                  <option value="FRONT_DESK">Front Office / Reception Desk (Approver: GM)</option>
+                  <option value="HOUSEKEEPER">Housekeeping Department (Approver: Housekeeping Manager / GM)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300">Brief Note for Approver (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Forgot Radisson login password, please reset."
+                  value={resetReason}
+                  onChange={(e) => setResetReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-primary font-medium"
+                />
+              </div>
+
+              {resetSuccessMsg && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-lg flex items-start space-x-2 font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span>{resetSuccessMsg}</span>
+                </div>
+              )}
+
+              {resetErrorMsg && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-lg font-medium">
+                  {resetErrorMsg}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotModalOpen(false)}
+                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-all"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReset}
+                  className="flex-1 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{isSubmittingReset ? "Submitting..." : "Submit Reset Request"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

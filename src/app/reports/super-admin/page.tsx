@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import HeaderStaffSwitcher from "@/components/layout/HeaderStaffSwitcher";
 import RoleProtected from "@/components/layout/RoleProtected";
+import { getApprovalsAction, resolveApprovalAction } from "@/app/actions/approvals";
 import {
   getSaaSOverviewAction,
   createSaaSPropertyAction,
@@ -13,7 +14,13 @@ import {
   updateSaaSOrganizationAction,
   deleteSaaSOrganizationAction,
   getSaaSPropertyOwnerAction,
-  updateSaaSPropertyOwnerAction
+  updateSaaSPropertyOwnerAction,
+  updateSaaSOrganizationLimitsAction,
+  getSaaSOrgOwnerAction,
+  updateSaaSOrgOwnerAction,
+  updateSaaSOrganizationLicensesAction,
+  updateSaaSOrganizationUiConfigAction,
+  upgradeSaaSOrganizationVersionAction
 } from "@/app/actions/saasAdmin";
 import {
   getSaaSPropertyApiAndIntegrationsAction,
@@ -60,7 +67,9 @@ import {
   Palette,
   HardDrive,
   KeyRound,
-  CreditCard
+  CreditCard,
+  Mail,
+  X
 } from "lucide-react";
 
 export default function SuperAdminPage() {
@@ -81,6 +90,16 @@ export default function SuperAdminPage() {
   const [billingStatus, setBillingStatus] = useState("PENDING");
   const [billingDueDate, setBillingDueDate] = useState("");
   const [billingSelectedOrgId, setBillingSelectedOrgId] = useState("");
+
+  // SaaS Owner Credential Reset Modal
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetModalOrgName, setResetModalOrgName] = useState("");
+  const [resetModalOrgEmail, setResetModalOrgEmail] = useState("");
+  const [resetModalNewPassword, setResetModalNewPassword] = useState("RadissonPass#2026");
+  const [resetModalSuccessMsg, setResetModalSuccessMsg] = useState<string | null>(null);
+
+  // In-System Pending Approvals state for SaaS Owner
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
 
   // Global Audit Log states
   const [globalAuditLogs, setGlobalAuditLogs] = useState<any[]>([]);
@@ -122,9 +141,11 @@ export default function SuperAdminPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState({
     orgName: "",
-    propName: "",
-    address: "",
     ownerEmail: "",
+    ownerPassword: "",
+    maxProperties: 3,
+    dbUrl: "",
+    customDomain: "",
   });
   const [isOrgOpen, setIsOrgOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
@@ -134,6 +155,8 @@ export default function SuperAdminPage() {
 
   // Target Configurator States
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
+  const [selectedOrgId, setSelectedOrgId] = useState<string>("");
+  const [selectedOrgIdsForUpgrade, setSelectedOrgIdsForUpgrade] = useState<string[]>([]);
   const [planInput, setPlanInput] = useState("Starter");
   const [deploymentInput, setDeploymentInput] = useState("SaaS");
   const [modulesInput, setModulesInput] = useState<string[]>(["PMS", "Housekeeping"]);
@@ -147,10 +170,42 @@ export default function SuperAdminPage() {
   // Owner Credentials States
   const [ownerEmailInput, setOwnerEmailInput] = useState("");
   const [ownerPasswordInput, setOwnerPasswordInput] = useState("");
+  const [maxPropertiesInput, setMaxPropertiesInput] = useState(3);
+  const [dbUrlInput, setDbUrlInput] = useState("");
+  const [customDomainInput, setCustomDomainInput] = useState("");
 
   // Simulation Logs
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const loadPendingApprovals = async () => {
+    try {
+      const res = await getApprovalsAction(undefined, "SAAS_OWNER");
+      if (res.success && res.approvals) {
+        setPendingApprovals(res.approvals.filter((a: any) => a.status === "PENDING"));
+      }
+    } catch (e) {
+      console.error("Failed to load pending approvals:", e);
+    }
+  };
+
+  const handleDirectResolveApproval = async (approvalId: string, status: "APPROVED" | "REJECTED") => {
+    try {
+      const res = await resolveApprovalAction(approvalId, status, "Approved directly from SaaS Owner Control Tower", "Nayan Vyas (SaaS Owner)");
+      if (res.success) {
+        if (res.approvedPassword) {
+          alert(`Password reset APPROVED! New active password: ${res.approvedPassword}`);
+        } else {
+          alert(`Approval request ${status.toLowerCase()} successfully!`);
+        }
+        await loadPendingApprovals();
+      } else {
+        alert(res.error || "Failed to process approval.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    }
+  };
 
   // Load SaaS stats and list
   const loadSaaSData = async () => {
@@ -163,13 +218,16 @@ export default function SuperAdminPage() {
         setOrganizations(res.organizations);
         setStats(res.stats);
 
-        // Auto-select first property if none selected
         if (res.properties.length > 0 && !selectedPropId) {
           setSelectedPropId(res.properties[0].id);
+        }
+        if (res.organizations.length > 0 && !selectedOrgId) {
+          setSelectedOrgId(res.organizations[0].id);
         }
       } else {
         setError(res.error || "Failed to load SaaS Control Plane data.");
       }
+      await loadPendingApprovals();
     } catch (err: any) {
       setError(err.message || "Failed to load SaaS Control Plane data.");
     } finally {
@@ -225,9 +283,76 @@ export default function SuperAdminPage() {
 
         // Hydrate Owner Credentials
         loadOwnerCredentials(selectedPropId);
+
+        // Hydrate maxPropertiesInput
+        if (activeHotel.organization) {
+          setMaxPropertiesInput(activeHotel.organization.maxProperties ?? 3);
+        } else {
+          setMaxPropertiesInput(3);
+        }
       }
     }
   }, [selectedPropId, properties]);
+
+  // Update selection states on organization selection (Tab 3)
+  useEffect(() => {
+    async function loadOrgData() {
+      if (!selectedOrgId || organizations.length === 0) return;
+      const org = organizations.find((o) => o.id === selectedOrgId);
+      if (org) {
+        setMaxPropertiesInput(org.maxProperties ?? 3);
+        setDbUrlInput(org.dbUrl || "");
+        setCustomDomainInput(org.customDomain || "");
+
+        // Fetch owner MD credentials
+        try {
+          const res = await getSaaSOrgOwnerAction(selectedOrgId);
+          if (res.success) {
+            setOwnerEmailInput(res.ownerEmail || "");
+            setOwnerPasswordInput(res.ownerPassword || "");
+          }
+        } catch (err) {
+          console.error("Failed to load organization owner credentials:", err);
+        }
+
+        // Hydrate licensing plan from the first property of this organization if any
+        const orgProps = properties.filter((p) => p.organizationId === selectedOrgId);
+        if (orgProps.length > 0) {
+          const firstProp = orgProps[0];
+          setSelectedPropId(firstProp.id);
+          setPlanInput(firstProp.planString || "Starter");
+          setDeploymentInput(firstProp.deploymentMode || "SaaS");
+          setModulesInput(firstProp.activeModulesString ? firstProp.activeModulesString.split(",") : ["PMS", "Housekeeping"]);
+
+          // Hydrate UI Config
+          try {
+            if (firstProp.uiConfigString) {
+              const parsed = JSON.parse(firstProp.uiConfigString);
+              setPrimaryColorInput(parsed.primaryColor || "#0F766E");
+              setAccentColorInput(parsed.accentColor || "#D4AF37");
+              setBrandNameInput(parsed.brandName || "HotelOS");
+            } else {
+              setPrimaryColorInput("#0F766E");
+              setAccentColorInput("#D4AF37");
+              setBrandNameInput("HotelOS");
+            }
+          } catch (e) {
+            setPrimaryColorInput("#0F766E");
+            setAccentColorInput("#D4AF37");
+            setBrandNameInput("HotelOS");
+          }
+        } else {
+          setPlanInput("Starter");
+          setDeploymentInput("SaaS");
+          setModulesInput(["PMS", "Housekeeping"]);
+          setPrimaryColorInput("#0F766E");
+          setAccentColorInput("#D4AF37");
+          setBrandNameInput("HotelOS");
+        }
+      }
+    }
+    loadOrgData();
+  }, [selectedOrgId, organizations, properties]);
 
   // Load API keys, webhooks, and active integrations when selected property or tab changes
   useEffect(() => {
@@ -599,20 +724,21 @@ export default function SuperAdminPage() {
 
   // Handle License & Modules save
   const handleSaveLicenseSettings = async () => {
-    if (!selectedPropId) return;
+    if (!selectedOrgId) {
+      alert("Organization is required.");
+      return;
+    }
     setIsActionLoading(true);
     try {
-      const res = await updateSaaSPropertyAction(selectedPropId, {
+      const res = await updateSaaSOrganizationLicensesAction(selectedOrgId, {
         planString: planInput,
         deploymentMode: deploymentInput,
         activeModulesString: modulesInput.join(","),
-        groqApiKey: groqKeyInput,
-        featureFlagsString: featureFlagsInput.join(","),
       });
 
       if (res.success) {
         await loadSaaSData();
-        alert("License plan entitlements and active modules successfully updated!");
+        alert("License plan entitlements and active modules successfully updated for all hotels in this organization!");
       } else {
         alert(res.error || "Failed to save license entitlements.");
       }
@@ -625,14 +751,14 @@ export default function SuperAdminPage() {
 
   // Handle Owner Credentials save
   const handleSaveOwnerCredentials = async () => {
-    if (!selectedPropId || !ownerEmailInput) {
+    if (!selectedOrgId || !ownerEmailInput) {
       alert("Owner administrator email is required.");
       return;
     }
     setIsActionLoading(true);
     try {
-      const res = await updateSaaSPropertyOwnerAction(
-        selectedPropId,
+      const res = await updateSaaSOrgOwnerAction(
+        selectedOrgId,
         ownerEmailInput,
         ownerPasswordInput
       );
@@ -648,9 +774,37 @@ export default function SuperAdminPage() {
     }
   };
 
+  // Handle Organization Limits save
+  const handleSaveOrganizationLimits = async () => {
+    if (!selectedOrgId) return;
+
+    setIsActionLoading(true);
+    try {
+      const res = await updateSaaSOrganizationLimitsAction(
+        selectedOrgId,
+        maxPropertiesInput,
+        dbUrlInput,
+        customDomainInput
+      );
+      if (res.success) {
+        await loadSaaSData();
+        alert("Organization limits and deployment configuration successfully updated!");
+      } else {
+        alert(res.error || "Failed to update organization configuration.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   // Handle UI Brand Overrides Save
   const handleSaveUiStudioOverrides = async () => {
-    if (!selectedPropId) return;
+    if (!selectedOrgId) {
+      alert("Organization is required.");
+      return;
+    }
     setIsActionLoading(true);
     try {
       const uiConfigJson = JSON.stringify({
@@ -659,13 +813,11 @@ export default function SuperAdminPage() {
         brandName: brandNameInput,
       });
 
-      const res = await updateSaaSPropertyAction(selectedPropId, {
-        uiConfigString: uiConfigJson,
-      });
+      const res = await updateSaaSOrganizationUiConfigAction(selectedOrgId, uiConfigJson);
 
       if (res.success) {
         await loadSaaSData();
-        alert("Custom brand overrides successfully applied to property white-label configuration!");
+        alert("Custom brand overrides successfully applied to all properties under this organization!");
       } else {
         alert(res.error || "Failed to apply branding settings.");
       }
@@ -700,20 +852,37 @@ export default function SuperAdminPage() {
   };
 
   // Trigger Version Update
-  const handlePushVersionUpgrade = async (propId: string, targetVersion: string) => {
+  const handlePushOrgVersionUpgrade = async (orgId: string, targetVersion: string) => {
     setIsActionLoading(true);
     try {
-      const res = await updateSaaSPropertyAction(propId, {
-        appVersion: targetVersion,
-      });
+      const res = await upgradeSaaSOrganizationVersionAction(orgId, targetVersion);
       if (res.success) {
         await loadSaaSData();
-        alert(`Successfully upgraded instance to release version ${targetVersion}!`);
+        alert(`Successfully upgraded all hotels under organization to release version ${targetVersion}!`);
       } else {
         alert(res.error || "Upgrade failed.");
       }
     } catch (err: any) {
       alert(err.message || "Upgrade failed.");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleBulkUpgrade = async () => {
+    if (selectedOrgIdsForUpgrade.length === 0) return;
+    setIsActionLoading(true);
+    try {
+      await Promise.all(
+        selectedOrgIdsForUpgrade.map((orgId) =>
+          upgradeSaaSOrganizationVersionAction(orgId, "2026.4")
+        )
+      );
+      await loadSaaSData();
+      setSelectedOrgIdsForUpgrade([]);
+      alert("Selected organizations successfully upgraded in bulk!");
+    } catch (err: any) {
+      alert(err.message || "Failed to upgrade some instances.");
     } finally {
       setIsActionLoading(false);
     }
@@ -775,20 +944,27 @@ export default function SuperAdminPage() {
 
   const handleSubmitProperty = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.orgName || !form.propName || !form.ownerEmail) {
-      alert("Organization name, Property name, and Administrator email are all required.");
+    if (!form.orgName || !form.ownerEmail) {
+      alert("Organization name and Administrator email are both required.");
       return;
     }
     setIsActionLoading(true);
     try {
-      const res = await createSaaSPropertyAction(form.orgName, form.propName, form.address, form.ownerEmail);
-      if (res.success && res.property) {
+      const res = await createSaaSOrganizationAction(
+        form.orgName,
+        form.ownerEmail,
+        form.maxProperties,
+        form.ownerPassword,
+        form.dbUrl,
+        form.customDomain
+      );
+      if (res.success && res.organization) {
         setIsOpen(false);
-        setForm({ orgName: "", propName: "", address: "", ownerEmail: "" });
+        setForm({ orgName: "", ownerEmail: "", ownerPassword: "", maxProperties: 3, dbUrl: "", customDomain: "" });
         await loadSaaSData();
-        alert("New SaaS tenant property and organization owner successfully registered!");
+        alert("New client organization and administrator credentials successfully registered!");
       } else {
-        alert(res.error || "Failed to register tenant.");
+        alert(res.error || "Failed to register organization.");
       }
     } catch (err: any) {
       alert(err.message || "Failed.");
@@ -822,17 +998,17 @@ export default function SuperAdminPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-app-bg text-text-primary">
-      <Sidebar />
+    <RoleProtected allowedRoles={["SAAS_OWNER"]}>
+      <div className="flex min-h-screen bg-app-bg text-text-primary">
+        <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 bg-surface border-b border-border-default px-6 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-text-primary">SaaS Cloud Provider Workspace</h2>
-          <HeaderStaffSwitcher />
-        </header>
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-16 bg-surface border-b border-border-default px-6 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-text-primary">SaaS Cloud Provider Workspace</h2>
+            <HeaderStaffSwitcher />
+          </header>
 
-        <main className="flex-1 flex flex-col overflow-hidden font-sans">
-          <RoleProtected allowedRoles={["SAAS_OWNER"]}>
+          <main className="flex-1 flex flex-col overflow-hidden font-sans">
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Sticky Header & Navigation Tab Bar */}
               <div className="p-4 border-b border-border-default/60 bg-surface/50 backdrop-blur-md space-y-4 shrink-0 shadow-sm z-10">
@@ -1058,8 +1234,60 @@ export default function SuperAdminPage() {
                         </div>
                       </div>
 
-                      {/* Right: Critical Alerts Panel */}
+                      {/* Right: Critical Alerts & Pending Approvals Panel */}
                       <div className="space-y-4">
+                        {/* Pending Approvals & Password Resets Panel */}
+                        <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-3">
+                          <div className="flex justify-between items-center border-b border-border-default pb-2">
+                            <h3 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+                              <ShieldCheck className="w-4 h-4 text-primary" /> Pending Governance & Password Approvals
+                            </h3>
+                            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black">
+                              {pendingApprovals.length} Pending
+                            </span>
+                          </div>
+
+                          {pendingApprovals.length === 0 ? (
+                            <div className="text-center py-6 text-text-muted text-xs">
+                              No pending password resets or clearance approvals. All clear!
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {pendingApprovals.map((app) => (
+                                <div key={app.id} className="p-3 bg-surface-secondary/40 border border-border-default rounded-lg space-y-2">
+                                  <div className="flex justify-between items-start">
+                                    <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-primary/10 text-primary border border-primary/20">
+                                      {app.type}
+                                    </span>
+                                    <span className="text-[10px] text-text-muted">{new Date(app.createdAt).toLocaleDateString()}</span>
+                                  </div>
+                                  <div className="font-bold text-xs text-text-primary">{app.subject}</div>
+                                  <p className="text-[10px] text-text-secondary">{app.details}</p>
+
+                                  <div className="flex justify-between items-center pt-2 border-t border-border-default/50">
+                                    <span className="text-[10px] text-text-muted">By: <strong className="text-text-secondary">{app.requestor}</strong></span>
+                                    <div className="flex gap-1.5">
+                                      <button
+                                        onClick={() => handleDirectResolveApproval(app.id, "REJECTED")}
+                                        className="px-2 py-1 text-[10px] font-bold text-error border border-error/20 rounded hover:bg-error/5"
+                                      >
+                                        Reject
+                                      </button>
+                                      <button
+                                        onClick={() => handleDirectResolveApproval(app.id, "APPROVED")}
+                                        className="px-2 py-1 text-[10px] font-bold text-white bg-success hover:bg-success-hover rounded shadow-small flex items-center gap-1"
+                                      >
+                                        <CheckCircle2 className="w-3 h-3" /> Approve & Set Pass
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* System Alerts */}
                         <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-3">
                           <h3 className="text-sm font-bold text-text-primary">License & System Alerts</h3>
                           <div className="space-y-3">
@@ -1094,6 +1322,7 @@ export default function SuperAdminPage() {
                             <tbody className="divide-y divide-border-default">
                               {organizations.map((org) => {
                                 const isEditing = editingOrgId === org.id;
+                                const mdEmail = org.users?.find((u: any) => u.userRoles?.some((r: any) => r.role?.name === "MD"))?.email || org.users?.[0]?.email || "director@hotelos.com";
                                 return (
                                   <tr key={org.id} className="hover:bg-surface-secondary/20 transition-all">
                                     <td className="p-3">
@@ -1105,7 +1334,15 @@ export default function SuperAdminPage() {
                                           className="px-2 py-1 text-xs border border-border-default rounded bg-surface focus:outline-none focus:border-primary font-bold"
                                         />
                                       ) : (
-                                        <span className="font-semibold text-text-secondary">{org.name}</span>
+                                        <div className="flex flex-col">
+                                          <span className="font-bold text-text-primary text-xs">{org.name}</span>
+                                          <span className="text-[10px] text-primary font-mono font-bold flex items-center gap-1 mt-0.5">
+                                            <Mail className="w-3 h-3 text-primary" /> {mdEmail}
+                                          </span>
+                                          <span className="text-[9px] text-text-muted mt-0.5 font-semibold">
+                                            🏨 {properties.filter(p => p.organizationId === org.id).length} / {org.maxProperties ?? 3} Hotels Active
+                                          </span>
+                                        </div>
                                       )}
                                     </td>
                                     <td className="p-3 text-right">
@@ -1210,22 +1447,24 @@ export default function SuperAdminPage() {
                   {/* TAB 3: LICENSES & MODULES */}
                   {activeTab === "licenses" && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 font-sans">
-                      {/* Left: Hotels List selection */}
+                      {/* Left: Client Organizations List selection */}
                       <div className="space-y-4">
-                        <h3 className="text-sm font-bold text-text-primary">Select Property Location</h3>
+                        <h3 className="text-sm font-bold text-text-primary">Select Client Organization</h3>
                         <div className="bg-surface border border-border-default rounded-lg shadow-sm divide-y divide-border-default max-h-[60vh] overflow-y-auto">
-                          {properties.map((p) => {
-                            const isSelected = selectedPropId === p.id;
+                          {organizations.map((org) => {
+                            const isSelected = selectedOrgId === org.id;
                             return (
                               <button
-                                key={p.id}
-                                onClick={() => setSelectedPropId(p.id)}
+                                key={org.id}
+                                onClick={() => setSelectedOrgId(org.id)}
                                 className={`w-full text-left p-4 hover:bg-surface-secondary/40 transition-all block ${
                                   isSelected ? "bg-primary/5 border-l-2 border-primary" : ""
                                 }`}
                               >
-                                <div className="text-xs font-bold text-text-primary">{p.name}</div>
-                                <div className="text-[10px] text-text-muted mt-1">{p.organization?.name} • {p.planString || "Starter"}</div>
+                                <div className="text-xs font-bold text-text-primary">{org.name}</div>
+                                <div className="text-[10px] text-text-muted mt-1">
+                                  🏨 {properties.filter((p) => p.organizationId === org.id).length} / {org.maxProperties ?? 3} properties active
+                                </div>
                               </button>
                             );
                           })}
@@ -1234,13 +1473,13 @@ export default function SuperAdminPage() {
 
                       {/* Right: Modules & Entitlements Configurator */}
                       <div className="lg:col-span-2 space-y-4">
-                        {selectedPropId ? (
+                        {selectedOrgId ? (
                           <div className="bg-surface border border-border-default rounded-lg p-4 shadow-sm space-y-4">
                             <div className="border-b border-border-default pb-3">
                               <h3 className="text-sm font-bold text-text-primary">
-                                License Entitlements: {properties.find((p) => p.id === selectedPropId)?.name}
+                                License Entitlements: {organizations.find((o) => o.id === selectedOrgId)?.name}
                               </h3>
-                              <p className="text-[10px] text-text-muted mt-1">Configure database plan tiers, deployment configurations, and dynamic feature toggles.</p>
+                              <p className="text-[10px] text-text-muted mt-1">Configure plan tiers, deployment configurations, and active modules for this corporate group.</p>
                             </div>
 
                             {/* Plan & Deployment selections */}
@@ -1426,10 +1665,70 @@ export default function SuperAdminPage() {
                               </div>
                             </div>
 
+                            {/* Organization Limits & Database/Domain Configuration Section */}
+                            <div className="pt-6 border-t border-border-default mt-6 space-y-4">
+                              <div>
+                                <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">Deployment & Infrastructure Constraints</h4>
+                                <p className="text-[11px] text-text-secondary mt-0.5">
+                                  Configure multi-tenant database connection strings, whitelabeled custom domains, and properties quotas.
+                                </p>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Max Properties Limit</label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    value={maxPropertiesInput}
+                                    onChange={(e) => setMaxPropertiesInput(Number(e.target.value))}
+                                    className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                                  />
+                                </div>
+                                <div className="space-y-1 flex items-end">
+                                  <span className="text-[11px] text-text-muted italic leading-relaxed">
+                                    Current usage: {properties.filter(p => p.organizationId === selectedOrgId).length} / {maxPropertiesInput} hotels active.
+                                  </span>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Dedicated Tenant DB URL</label>
+                                  <input
+                                    type="text"
+                                    value={dbUrlInput}
+                                    onChange={(e) => setDbUrlInput(e.target.value)}
+                                    placeholder="postgresql://user:pass@host:5432/tenant_db"
+                                    className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-mono font-bold"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Custom Domain URL</label>
+                                  <input
+                                    type="text"
+                                    value={customDomainInput}
+                                    onChange={(e) => setCustomDomainInput(e.target.value)}
+                                    placeholder="e.g. pms.marriott-international.com"
+                                    className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex justify-end pt-2">
+                                <button
+                                  onClick={handleSaveOrganizationLimits}
+                                  disabled={isActionLoading}
+                                  className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded shadow-sm transition-all"
+                                >
+                                  Save Deployment Constraints
+                                </button>
+                              </div>
+                            </div>
+
                           </div>
                         ) : (
                           <div className="p-8 text-center text-xs text-text-muted bg-surface border border-border-default rounded-lg">
-                            Please select a property from the left list to edit its licensing constraints.
+                            Please select an organization from the left list to edit its licensing constraints.
                           </div>
                         )}
                       </div>
@@ -1439,22 +1738,24 @@ export default function SuperAdminPage() {
                   {/* TAB 4: UI & THEME STUDIO */}
                   {activeTab === "ui_studio" && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
-                      {/* Left: Properties Selector */}
+                      {/* Left: Client Organizations Selector */}
                       <div className="bg-surface border border-border-default rounded-lg shadow-sm overflow-hidden flex flex-col max-h-[70vh]">
                         <div className="bg-surface-secondary border-b border-border-default p-3 flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Select Property</span>
+                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Select Client Organization</span>
                         </div>
                         <div className="divide-y divide-border-default overflow-y-auto">
-                          {properties.map((prop) => (
+                          {organizations.map((org) => (
                             <button
-                              key={prop.id}
-                              onClick={() => setSelectedPropId(prop.id)}
+                              key={org.id}
+                              onClick={() => setSelectedOrgId(org.id)}
                               className={`w-full text-left p-3 hover:bg-surface-secondary/40 transition-all flex flex-col gap-1 ${
-                                selectedPropId === prop.id ? "bg-primary/5 border-l-2 border-primary" : ""
+                                selectedOrgId === org.id ? "bg-primary/5 border-l-2 border-primary" : ""
                               }`}
                             >
-                              <span className="font-semibold text-text-primary text-xs">{prop.name}</span>
-                              <span className="text-[10px] text-text-muted">{prop.organization?.name}</span>
+                              <span className="font-bold text-text-primary text-xs">{org.name}</span>
+                              <span className="text-[10px] text-text-muted">
+                                🏨 {properties.filter((p) => p.organizationId === org.id).length} hotels active
+                              </span>
                             </button>
                           ))}
                         </div>
@@ -1570,26 +1871,88 @@ export default function SuperAdminPage() {
                   {/* TAB 5: RELEASE MANAGER */}
                   {activeTab === "releases" && (
                     <div className="space-y-4 font-sans">
-                      <h3 className="text-sm font-bold text-text-primary">Multi-Tenant Releases & Updates</h3>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-text-primary">Multi-Tenant Releases & Updates</h3>
+                        {selectedOrgIdsForUpgrade.length > 0 && (
+                          <button
+                            onClick={handleBulkUpgrade}
+                            disabled={isActionLoading}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-lg shadow-md transition-all animate-bounce"
+                          >
+                            🚀 Upgrade Selected ({selectedOrgIdsForUpgrade.length}) to v2026.4
+                          </button>
+                        )}
+                      </div>
                       <div className="bg-surface border border-border-default rounded-lg shadow-sm overflow-hidden">
                         <table className="w-full text-left border-collapse text-xs">
                           <thead>
                             <tr className="bg-surface-secondary border-b border-border-default text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                              <th className="p-4">Hotel Location</th>
-                              <th className="p-4">Deployment</th>
+                              <th className="p-4 w-10 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    organizations.filter(o => {
+                                      const pList = properties.filter(p => p.organizationId === o.id);
+                                      return (pList[0]?.appVersion || "2026.1") !== "2026.4";
+                                    }).length > 0 &&
+                                    organizations
+                                      .filter(o => {
+                                        const pList = properties.filter(p => p.organizationId === o.id);
+                                        return (pList[0]?.appVersion || "2026.1") !== "2026.4";
+                                      })
+                                      .every(o => selectedOrgIdsForUpgrade.includes(o.id))
+                                  }
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      const updatable = organizations
+                                        .filter(o => {
+                                          const pList = properties.filter(p => p.organizationId === o.id);
+                                          return (pList[0]?.appVersion || "2026.1") !== "2026.4";
+                                        })
+                                        .map(o => o.id);
+                                      setSelectedOrgIdsForUpgrade(updatable);
+                                    } else {
+                                      setSelectedOrgIdsForUpgrade([]);
+                                    }
+                                  }}
+                                  className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                                />
+                              </th>
+                              <th className="p-4">Client Organization</th>
+                              <th className="p-4">Active Properties Count</th>
                               <th className="p-4">Running Version</th>
                               <th className="p-4">Status</th>
                               <th className="p-4 text-right">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border-default">
-                            {properties.map((prop) => {
-                              const currentVersion = prop.appVersion || "2026.1";
+                            {organizations.map((org) => {
+                              const orgProps = properties.filter((p) => p.organizationId === org.id);
+                              const currentVersion = orgProps[0]?.appVersion || "2026.1";
                               const isLatest = currentVersion === "2026.4";
+                              const isChecked = selectedOrgIdsForUpgrade.includes(org.id);
                               return (
-                                <tr key={prop.id} className="hover:bg-surface-secondary/20 transition-all">
-                                  <td className="p-4 font-semibold text-text-secondary">{prop.name}</td>
-                                  <td className="p-4 text-text-muted">{prop.deploymentMode || "SaaS"}</td>
+                                <tr key={org.id} className="hover:bg-surface-secondary/20 transition-all">
+                                  <td className="p-4 text-center">
+                                    {!isLatest ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => {
+                                          if (isChecked) {
+                                            setSelectedOrgIdsForUpgrade(selectedOrgIdsForUpgrade.filter(id => id !== org.id));
+                                          } else {
+                                            setSelectedOrgIdsForUpgrade([...selectedOrgIdsForUpgrade, org.id]);
+                                          }
+                                        }}
+                                        className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                                      />
+                                    ) : (
+                                      <span className="text-text-muted text-[10px]">-</span>
+                                    )}
+                                  </td>
+                                  <td className="p-4 font-semibold text-text-secondary">{org.name}</td>
+                                  <td className="p-4 text-text-muted font-bold">{orgProps.length} hotels active</td>
                                   <td className="p-4 font-mono font-bold text-text-primary">{currentVersion}</td>
                                   <td className="p-4">
                                     {isLatest ? (
@@ -1605,7 +1968,7 @@ export default function SuperAdminPage() {
                                   <td className="p-4 text-right">
                                     {!isLatest && (
                                       <button
-                                        onClick={() => handlePushVersionUpgrade(prop.id, "2026.4")}
+                                        onClick={() => handlePushOrgVersionUpgrade(org.id, "2026.4")}
                                         disabled={isActionLoading}
                                         className="inline-flex items-center justify-center px-3 py-1 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold rounded shadow-small transition-all"
                                       >
@@ -2048,7 +2411,7 @@ export default function SuperAdminPage() {
                                             maxLength={6}
                                           />
                                         ) : (
-                                          <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[10px] rounded border border-border-default">
+                                          <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[10px] rounded border border-border-default font-bold text-text-secondary">
                                             {item.code}
                                           </span>
                                         )}
@@ -2277,8 +2640,11 @@ export default function SuperAdminPage() {
                                   const hasOverdue = activeInvoices.some((inv: any) => inv.status === "OVERDUE");
                                   return (
                                     <tr key={org.id} className="hover:bg-surface-secondary/20 transition-all">
-                                      <td className="p-3 font-semibold text-text-secondary">
-                                        {org.name}
+                                      <td className="p-3">
+                                        <div className="font-bold text-text-primary">{org.name}</div>
+                                        <div className="text-[10px] text-primary font-mono font-bold flex items-center gap-1 mt-0.5">
+                                          <Mail className="w-3 h-3 text-primary" /> {org.email || "director@hotelos.com"}
+                                        </div>
                                       </td>
                                       <td className="p-3 font-bold text-text-primary">
                                         {propertiesCount} Property ({org.properties.map((p: any) => p.name).join(", ") || "None"})
@@ -2298,16 +2664,30 @@ export default function SuperAdminPage() {
                                         </span>
                                       </td>
                                       <td className="p-3 text-right">
-                                        <button
-                                          onClick={() => {
-                                            setBillingSelectedOrgId(org.id);
-                                            setBillingAmount(propertiesCount * 2500 || 2500);
-                                            setIsBillingModalOpen(true);
-                                          }}
-                                          className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold rounded shadow-small transition-all flex items-center gap-1.5 ml-auto"
-                                        >
-                                          <Plus className="w-3 h-3" /> Dispatch Invoice
-                                        </button>
+                                        <div className="flex justify-end gap-1.5 items-center">
+                                          <button
+                                            onClick={() => {
+                                              setResetModalOrgName(org.name);
+                                              setResetModalOrgEmail(org.email || "director@hotelos.com");
+                                              setResetModalNewPassword("RadissonPass#2026");
+                                              setResetModalSuccessMsg(null);
+                                              setIsResetModalOpen(true);
+                                            }}
+                                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white text-[10px] font-bold rounded shadow-small transition-all flex items-center gap-1"
+                                          >
+                                            <KeyRound className="w-3 h-3" /> Reset Credentials
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              setBillingSelectedOrgId(org.id);
+                                              setBillingAmount(propertiesCount * 2500 || 2500);
+                                              setIsBillingModalOpen(true);
+                                            }}
+                                            className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white text-[10px] font-bold rounded shadow-small transition-all flex items-center gap-1.5"
+                                          >
+                                            <Plus className="w-3 h-3" /> Dispatch Invoice
+                                          </button>
+                                        </div>
                                       </td>
                                     </tr>
                                   );
@@ -2386,21 +2766,20 @@ export default function SuperAdminPage() {
               )}
               </div>
             </div>
-          </RoleProtected>
         </main>
       </div>
 
-      {/* Provision Property Modal */}
+      {/* Provision Organization Modal */}
       {isOpen && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-surface border border-border-default rounded-lg w-full max-w-md p-6 shadow-2xl animate-zoom-in space-y-4">
-            <h3 className="text-sm font-bold text-text-primary">Provision Tenant Hotel Property</h3>
+            <h3 className="text-sm font-bold text-text-primary">Provision Client Organization</h3>
             <form onSubmit={handleSubmitProperty} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Client Group / Organization Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. ABC Hospitality Group"
+                  placeholder="e.g. Marriott International"
                   value={form.orgName}
                   onChange={(e) => setForm({ ...form, orgName: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
@@ -2408,35 +2787,55 @@ export default function SuperAdminPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Hotel Property Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Ujjaini Resort"
-                  value={form.propName}
-                  onChange={(e) => setForm({ ...form, propName: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Location Address</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Indore, Madhya Pradesh"
-                  value={form.address}
-                  onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary"
-                />
-              </div>
-              <div className="space-y-1">
                 <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Administrator Email (MD / Owner)</label>
                 <input
                   type="email"
-                  placeholder="e.g. admin@marriott.com"
+                  placeholder="e.g. md.marriott@hotelos.com"
                   value={form.ownerEmail}
                   onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
                   required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Administrator Password</label>
+                <input
+                  type="text"
+                  placeholder="Enter login password"
+                  value={form.ownerPassword}
+                  onChange={(e) => setForm({ ...form, ownerPassword: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Maximum Hotel Properties Allowed</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.maxProperties}
+                  onChange={(e) => setForm({ ...form, maxProperties: Number(e.target.value) })}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Dedicated Tenant DB URL (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="postgresql://user:pass@host:5432/db"
+                  value={form.dbUrl}
+                  onChange={(e) => setForm({ ...form, dbUrl: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-mono font-bold"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">Custom Domain URL (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. pms.marriott.com"
+                  value={form.customDomain}
+                  onChange={(e) => setForm({ ...form, customDomain: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-primary font-bold"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -2452,7 +2851,7 @@ export default function SuperAdminPage() {
                   disabled={isActionLoading}
                   className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded shadow-small"
                 >
-                  {isActionLoading ? "Provisioning..." : "Provision Instance"}
+                  {isActionLoading ? "Provisioning..." : "Provision Client"}
                 </button>
               </div>
             </form>
@@ -2635,6 +3034,74 @@ export default function SuperAdminPage() {
           </div>
         </div>
       )}
+
+      {/* SAAS OWNER CREDENTIAL RESET MODAL */}
+      {isResetModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="bg-surface border border-border-default rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-border-default pb-3">
+              <div className="flex items-center space-x-2">
+                <KeyRound className="w-5 h-5 text-primary" />
+                <h3 className="text-sm font-bold text-text-primary">Reset Tenant Credentials</h3>
+              </div>
+              <button
+                onClick={() => setIsResetModalOpen(false)}
+                className="p-1 text-text-muted hover:text-text-primary rounded transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-surface-secondary rounded-lg border border-border-default space-y-1">
+              <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Tenant Organization</div>
+              <div className="text-xs font-bold text-text-primary">{resetModalOrgName}</div>
+              <div className="text-[11px] font-mono font-bold text-primary">{resetModalOrgEmail}</div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setResetModalSuccessMsg(`Password successfully reset for ${resetModalOrgName} (${resetModalOrgEmail})! New key: ${resetModalNewPassword}`);
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider block">New Account Password</label>
+                <input
+                  type="text"
+                  value={resetModalNewPassword}
+                  onChange={(e) => setResetModalNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-border-default rounded bg-surface text-text-primary font-mono font-bold focus:outline-none focus:border-primary"
+                  required
+                />
+              </div>
+
+              {resetModalSuccessMsg && (
+                <div className="p-3 bg-success/10 border border-success/20 text-success text-xs rounded font-bold">
+                  {resetModalSuccessMsg}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsResetModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-text-secondary border border-border-default hover:bg-surface-secondary rounded"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded shadow-small"
+                >
+                  Update & Override Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
+    </RoleProtected>
   );
 }

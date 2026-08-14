@@ -17,6 +17,8 @@ interface SyncTransaction {
 interface SyncContextType {
   isOnline: boolean;
   pendingCount: number;
+  deferredPrompt: any;
+  installDesktopApp: () => void;
   executeOfflineAction: (
     action: SyncTransaction["action"],
     payload: any
@@ -29,12 +31,27 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [queue, setQueue] = useState<SyncTransaction[]>([]);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // Track online/offline status
+  // Register Service Worker & Track Online/Offline Status
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     setIsOnline(window.navigator.onLine);
+
+    // Register PWA Service Worker for Offline Caching
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => console.log("[PWA] Service Worker registered successfully:", reg.scope))
+        .catch((err) => console.warn("[PWA] Service Worker registration failed:", err));
+    }
+
+    // Capture PWA Install Prompt
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
 
     const handleOnline = () => {
       setIsOnline(true);
@@ -48,6 +65,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
 
     // Initial load of queue from localStorage
     const savedQueue = localStorage.getItem("hotelos-offline-sync-queue");
@@ -62,8 +80,22 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
     };
   }, []);
+
+  const installDesktopApp = async () => {
+    if (!deferredPrompt) {
+      alert("HotelOS Desktop App is already installed or your browser doesn't support 1-click install. You can also click 'Install' in your browser address bar!");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      console.log("User accepted the HotelOS Desktop App install prompt");
+      setDeferredPrompt(null);
+    }
+  };
 
   // Sync queue to localStorage whenever it changes
   useEffect(() => {
@@ -183,7 +215,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SyncContext.Provider value={{ isOnline, pendingCount: queue.length, executeOfflineAction }}>
+    <SyncContext.Provider value={{ isOnline, pendingCount: queue.length, deferredPrompt, installDesktopApp, executeOfflineAction }}>
       {children}
       <NetworkStatusIndicator isOnline={isOnline} pendingCount={queue.length} syncStatus={syncStatus} />
     </SyncContext.Provider>

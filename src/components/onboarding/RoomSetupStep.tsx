@@ -27,6 +27,19 @@ interface RoomSetupStepProps {
   error: string | null;
 }
 
+const PRESET_CATEGORIES = [
+  { name: "Deluxe Room", code: "DLX", price: 4000, capacity: 2, beds: 1 },
+  { name: "Standard Room", code: "STD", price: 2500, capacity: 2, beds: 1 },
+  { name: "Executive Suite", code: "EXE", price: 7500, capacity: 4, beds: 2 },
+  { name: "Presidential Suite", code: "PRS", price: 15000, capacity: 4, beds: 2 },
+  { name: "Family Villa / Suite", code: "FAM", price: 9000, capacity: 6, beds: 3 },
+  { name: "Penthouse Suite", code: "PNT", price: 20000, capacity: 4, beds: 2 },
+  { name: "Single Economy Room", code: "SGL", price: 1800, capacity: 1, beds: 1 },
+  { name: "Twin Deluxe Room", code: "TWN", price: 4500, capacity: 2, beds: 2 },
+  { name: "Honeymoon Ocean Suite", code: "HNM", price: 12000, capacity: 2, beds: 1 },
+  { name: "Accessible Room", code: "ACC", price: 3000, capacity: 2, beds: 1 },
+];
+
 export default function RoomSetupStep({ onComplete, isLoading, error }: RoomSetupStepProps) {
   const [floorsCount, setFloorsCount] = useState(3);
   const [floorRooms, setFloorRooms] = useState<number[]>([15, 15, 15]);
@@ -202,32 +215,55 @@ export default function RoomSetupStep({ onComplete, isLoading, error }: RoomSetu
               key={idx}
               className="p-4 border border-border-default rounded-md bg-surface-secondary grid grid-cols-12 gap-3 items-end relative group"
             >
-              {/* Name (span 4/12) */}
+              {/* Name & Preset Select (span 4/12) */}
               <div className="col-span-12 sm:col-span-4 space-y-1">
-                <label className="text-xs text-text-secondary font-semibold">Name</label>
+                <label className="text-xs text-text-secondary font-semibold">Category Preset & Name</label>
+                <select
+                  value={PRESET_CATEGORIES.some((p) => p.name === rt.name) ? rt.name : "CUSTOM"}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const preset = PRESET_CATEGORIES.find((p) => p.name === val);
+                    if (preset && val !== "CUSTOM") {
+                      handleRoomTypeChange(idx, "name", preset.name);
+                      handleRoomTypeChange(idx, "code", preset.code);
+                      handleRoomTypeChange(idx, "basePrice", preset.price);
+                      handleRoomTypeChange(idx, "capacity", preset.capacity);
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="w-full px-2 py-1 border border-border-default rounded bg-surface text-xs font-semibold text-text-primary focus:outline-none mb-1"
+                >
+                  <option value="">-- Choose Category --</option>
+                  {PRESET_CATEGORIES.map((cat) => (
+                    <option key={cat.code} value={cat.name}>
+                      🛏️ {cat.name} ({cat.code})
+                    </option>
+                  ))}
+                  <option value="CUSTOM">➕ + Custom Name...</option>
+                </select>
                 <input
                   type="text"
                   value={rt.name}
                   onChange={(e) => handleRoomTypeChange(idx, "name", e.target.value)}
-                  placeholder="Type Name"
+                  placeholder="Category Name"
                   required
                   disabled={isLoading}
-                  className="w-full px-3 py-1.5 border border-border-default rounded bg-surface text-sm text-text-primary focus:outline-none focus:border-primary"
+                  className="w-full px-3 py-1.5 border border-border-default rounded bg-surface text-sm text-text-primary focus:outline-none focus:border-primary font-medium"
                 />
               </div>
               
               {/* Code (span 2/12) */}
               <div className="col-span-12 sm:col-span-2 space-y-1">
-                <label className="text-xs text-text-secondary font-semibold">Code (3 Chars)</label>
+                <label className="text-xs text-text-secondary font-semibold">Code (Auto)</label>
                 <input
                   type="text"
                   value={rt.code}
-                  maxLength={3}
+                  maxLength={5}
                   onChange={(e) => handleRoomTypeChange(idx, "code", e.target.value.toUpperCase())}
                   placeholder="Code"
                   required
                   disabled={isLoading}
-                  className="w-full px-3 py-1.5 border border-border-default rounded bg-surface text-sm text-text-primary focus:outline-none focus:border-primary"
+                  className="w-full px-2.5 py-1.5 border border-border-default rounded bg-surface text-sm text-text-primary font-bold font-mono focus:outline-none focus:border-primary"
                 />
               </div>
 

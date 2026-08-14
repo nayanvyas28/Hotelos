@@ -24,6 +24,8 @@ import {
   LogOut,
   MapPin,
   Layers,
+  Menu,
+  X,
 } from "lucide-react";
 
 const GeminiLogo = (props: React.SVGProps<SVGSVGElement>) => (
@@ -53,6 +55,11 @@ export default function Sidebar({ currentActive }: SidebarProps) {
   const navRef = useRef<HTMLElement>(null);
   const [showOperations, setShowOperations] = useState<boolean>(false);
   const [isSupportActive, setIsSupportActive] = useState<boolean>(false);
+  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsMobileOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -90,7 +97,8 @@ export default function Sidebar({ currentActive }: SidebarProps) {
   useEffect(() => {
     async function fetchProperties() {
       try {
-        const res = await getPropertiesAction();
+        const orgId = currentUser?.role === "SAAS_OWNER" ? undefined : currentUser?.organizationId;
+        const res = await getPropertiesAction(orgId);
         if (res.success && res.properties) {
           setProperties(res.properties);
         }
@@ -99,7 +107,7 @@ export default function Sidebar({ currentActive }: SidebarProps) {
       }
     }
     fetchProperties();
-  }, []);
+  }, [currentUser]);
 
   const activeProperty = properties.find((p) => p.id === activePropertyId);
   let primaryColor = "#0F766E";
@@ -141,7 +149,8 @@ export default function Sidebar({ currentActive }: SidebarProps) {
     "/reports/super-admin": ["SAAS_OWNER"],
     "/reports/notifications": ["MD", "CFO", "GM"],
     "/reports/finance": ["MD", "CFO"],
-    "/profile": ["MD", "CFO", "GM", "FRONT_DESK", "HOUSEKEEPER", "SPA_THERAPIST"],
+    "/profile": ["MD", "CFO", "GM", "HR_MANAGER", "HR_COORDINATOR", "FRONT_DESK", "HOUSEKEEPER", "SPA_THERAPIST"],
+    "/hr": ["MD", "CFO", "GM", "HR_MANAGER", "HR_COORDINATOR", "FRONT_DESK", "HOUSEKEEPER", "SPA_THERAPIST"],
   };
 
   const menuGroups = [
@@ -176,8 +185,9 @@ export default function Sidebar({ currentActive }: SidebarProps) {
       ],
     },
     {
-      title: "CRM & ASSETS",
+      title: "CRM & WORKFORCE",
       items: [
+        { href: "/hr", label: "HR & Workforce Hub", icon: Users },
         { href: "/guests", label: "Guests CRM", icon: Users },
         { href: "/inventory", label: "Inventory & Stock", icon: Archive },
         { href: "/corporate", label: "Corporate CRM", icon: Briefcase },
@@ -232,21 +242,29 @@ export default function Sidebar({ currentActive }: SidebarProps) {
     }))
     .filter((group) => group.items.length > 0);
 
-  return (
-    <aside className="w-64 bg-surface border-r border-border-default hidden md:flex flex-col h-screen sticky top-0 shrink-0">
+  const renderSidebarContent = () => (
+    <div className="flex flex-col h-full bg-surface">
       {/* Brand Header */}
       <div className="p-6 border-b border-border-default space-y-4">
-        <div className="flex items-center space-x-3">
-          <div
-            style={{ backgroundColor: primaryColor }}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-primary/20"
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div
+              style={{ backgroundColor: primaryColor }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-primary/20"
+            >
+              <Hotel className="w-5 h-5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-base tracking-tight text-text-primary leading-none">{brandName}</span>
+              <span className="text-[10px] font-semibold text-text-muted mt-1 uppercase tracking-wider">Enterprise HQ</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsMobileOpen(false)}
+            className="md:hidden p-1.5 text-text-muted hover:text-text-primary rounded"
           >
-            <Hotel className="w-5 h-5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-base tracking-tight text-text-primary leading-none">{brandName}</span>
-            <span className="text-[10px] font-semibold text-text-muted mt-1 uppercase tracking-wider">Enterprise HQ</span>
-          </div>
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {currentUser?.scope === "GLOBAL" && properties.length > 0 && (currentUser?.role !== "SAAS_OWNER" || showOperations) && (
@@ -310,6 +328,7 @@ export default function Sidebar({ currentActive }: SidebarProps) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={() => setIsMobileOpen(false)}
                     style={
                       active
                         ? {
@@ -363,6 +382,53 @@ export default function Sidebar({ currentActive }: SidebarProps) {
           </div>
         </div>
       )}
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* 1. Mobile Top Bar Header (Visible only on mobile screens < md) */}
+      <div className="md:hidden flex items-center justify-between p-3.5 bg-surface border-b border-border-default sticky top-0 z-30 w-full">
+        <div className="flex items-center space-x-2.5">
+          <button
+            onClick={() => setIsMobileOpen(!isMobileOpen)}
+            className="p-2 text-text-primary hover:bg-surface-hover rounded-lg transition-all border border-border-default cursor-pointer"
+            aria-label="Toggle navigation menu"
+          >
+            {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+          <div className="flex items-center space-x-2">
+            <div
+              style={{ backgroundColor: primaryColor }}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-white font-bold shadow-sm"
+            >
+              <Hotel className="w-4 h-4" />
+            </div>
+            <span className="font-extrabold text-sm text-text-primary tracking-tight">{brandName}</span>
+          </div>
+        </div>
+        <span className="text-[10px] font-black text-primary px-2 py-0.5 rounded bg-primary/10 border border-primary/20 uppercase">
+          {currentUser?.role || "GUEST"}
+        </span>
+      </div>
+
+      {/* 2. Mobile Slide-Over Drawer Overlay */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs animate-in fade-in"
+            onClick={() => setIsMobileOpen(false)}
+          />
+          <div className="relative w-72 max-w-[80vw] bg-surface h-full shadow-2xl z-10 animate-in slide-in-from-left duration-200">
+            {renderSidebarContent()}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Desktop Persistent Sidebar */}
+      <aside className="w-64 bg-surface border-r border-border-default hidden md:flex flex-col h-screen sticky top-0 shrink-0">
+        {renderSidebarContent()}
+      </aside>
+    </>
   );
 }

@@ -83,9 +83,11 @@ export async function getDashboardStatsAction(propertyId: string) {
   }
 }
 
-export async function getGroupDashboardStatsAction() {
+export async function getGroupDashboardStatsAction(organizationId?: string) {
   try {
+    const where = organizationId ? { organizationId } : {};
     const properties = await db.property.findMany({
+      where,
       include: {
         rooms: true,
         reservations: {

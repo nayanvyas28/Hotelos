@@ -33,6 +33,105 @@ import {
 import Link from "next/link";
 import { getSaaSOverviewAction } from "@/app/actions/saasAdmin";
 
+// ----------------------------------------------------
+// HR & Workforce Operations Dashboard View (HR_MANAGER / HR_COORDINATOR)
+// ----------------------------------------------------
+function HRDashboard({ stats }: { stats: any }) {
+  return (
+    <div className="space-y-6">
+      {/* HR Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 font-sans">
+        <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xxs font-bold text-text-muted uppercase tracking-wider">Active Staff Headcount</span>
+            <span className="p-2 rounded bg-primary-light text-primary"><Users className="w-5 h-5" /></span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-text-primary">Staff Directory</div>
+            <p className="text-xxs text-text-secondary mt-1">Real Database Employee Accounts</p>
+          </div>
+        </div>
+
+        <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xxs font-bold text-text-muted uppercase tracking-wider">On-Duty Shifts Today</span>
+            <span className="p-2 rounded bg-indigo-500/10 text-indigo-500"><Clock className="w-5 h-5" /></span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-text-primary">Shift Roster</div>
+            <p className="text-xxs text-text-secondary mt-1 flex items-center text-success">
+              <CheckCircle2 className="w-3 h-3 mr-1" /> Shift Coverage Active
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xxs font-bold text-text-muted uppercase tracking-wider">Pending Leave Requests</span>
+            <span className="p-2 rounded bg-warning/10 text-warning"><Calendar className="w-5 h-5" /></span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-amber-500">Leave Console</div>
+            <p className="text-xxs text-text-secondary mt-1">Approvals & PTO Tracking</p>
+          </div>
+        </div>
+
+        <div className="bg-surface border border-border-default rounded-lg p-5 shadow-small space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xxs font-bold text-text-muted uppercase tracking-wider">Workforce Health SLA</span>
+            <span className="p-2 rounded bg-success/10 text-success"><Activity className="w-5 h-5" /></span>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-success">Optimal Status</div>
+            <p className="text-xxs text-text-secondary mt-1">Compliance & Roster Sync</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main HR Control Launch Banner */}
+      <Link
+        href="/hr"
+        className="bg-primary/5 border border-primary/30 hover:border-primary p-6 rounded-lg shadow-small flex items-center justify-between group transition-all"
+      >
+        <div className="space-y-1">
+          <h3 className="text-base font-extrabold text-primary group-hover:underline flex items-center gap-2">
+            <Users className="w-5 h-5" /> Launch HR & Workforce Management Hub
+          </h3>
+          <p className="text-xs text-text-secondary">
+            Manage employee lifecycle, shift scheduling, biometric attendance, leave approvals, skill certifications, and performance appraisals.
+          </p>
+        </div>
+        <ArrowRight className="w-5 h-5 text-primary group-hover:translate-x-1 transition-all" />
+      </Link>
+
+      {/* Operational Shortcuts */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <Link
+          href="/hr"
+          className="bg-surface border border-border-default hover:border-primary/50 p-6 rounded-lg shadow-small flex items-center justify-between group transition-all"
+        >
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-text-primary group-hover:text-primary transition-all">Employee Directory & Onboarding</h3>
+            <p className="text-xs text-text-secondary">Register new staff accounts, set designations, and inspect staff profiles.</p>
+          </div>
+          <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-primary transition-all" />
+        </Link>
+
+        <Link
+          href="/hr"
+          className="bg-surface border border-border-default hover:border-primary/50 p-6 rounded-lg shadow-small flex items-center justify-between group transition-all"
+        >
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-text-primary group-hover:text-primary transition-all">Staff Shift Roster & Scheduling</h3>
+            <p className="text-xs text-text-secondary">Schedule morning, evening, and night shifts with labor forecast tracking.</p>
+          </div>
+          <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-primary transition-all" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const { currentUser, activePropertyId } = useSession();
 
@@ -55,7 +154,7 @@ export default function Home() {
           setError(resSaas.error || "Failed to load SaaS platform metrics.");
         }
       } else if (currentUser?.role === "MD" || currentUser?.role === "CFO") {
-        const res = await getGroupDashboardStatsAction();
+        const res = await getGroupDashboardStatsAction(currentUser.organizationId);
         if (res.success) {
           setGroupStats(res.groupStats);
         } else {
@@ -167,6 +266,10 @@ export default function Home() {
 
             {currentUser.role === "SPA_THERAPIST" && stats && (
               <SpaDashboard stats={stats} />
+            )}
+
+            {(currentUser.role === "HR_MANAGER" || currentUser.role === "HR_COORDINATOR") && (
+              <HRDashboard stats={stats} />
             )}
           </main>
         )}

@@ -6,12 +6,14 @@ import { setupPropertyAction, setupRoomsAction } from "@/app/actions/property";
 import OrganizationStep from "@/components/onboarding/OrganizationStep";
 import PropertyStep from "@/components/onboarding/PropertyStep";
 import RoomSetupStep from "@/components/onboarding/RoomSetupStep";
-import { CheckCircle2, ChevronRight, Hotel, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronRight, Hotel, Loader2, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "@/context/SessionContext";
 
 type Step = "ORGANIZATION" | "PROPERTY" | "ROOMS" | "SUCCESS";
 
 export default function OnboardingPage() {
+  const { logout } = useSession();
   const [step, setStep] = useState<Step>("ORGANIZATION");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +108,15 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center bg-app-bg py-12 px-4 sm:px-6 lg:px-8 transition-colors">
+    <div className="min-h-screen flex flex-col justify-center bg-app-bg py-12 px-4 sm:px-6 lg:px-8 transition-colors relative">
+      <div className="absolute top-6 right-6">
+        <button
+          onClick={logout}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-text-secondary hover:text-rose-600 bg-surface border border-border-default rounded-lg hover:bg-rose-50 transition-all cursor-pointer shadow-sm"
+        >
+          <LogOut className="w-3.5 h-3.5" /> Sign Out
+        </button>
+      </div>
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center flex flex-col items-center">
         {/* Premium Brand Header */}
         <div className="flex items-center space-x-2 mb-2">

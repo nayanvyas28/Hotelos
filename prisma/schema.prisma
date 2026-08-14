@@ -12,13 +12,16 @@ datasource db {
 
 // 1. Tenant Models
 model Organization {
-  id           String        @id @default(uuid())
-  name         String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  properties   Property[]
-  users        User[]
-  saasInvoices SaasInvoice[]
+  id            String        @id @default(uuid())
+  name          String
+  maxProperties Int           @default(3) // Maximum allowed properties for this tenant group
+  dbUrl         String?       @default("") // Dedicated database connection string
+  customDomain  String?       @default("") // White-label custom domain mapping
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  properties    Property[]
+  users         User[]
+  saasInvoices  SaasInvoice[]
 }
 
 model Property {
@@ -62,6 +65,7 @@ model Property {
   appVersion          String          @default("2026.1")
   enabledIntegrationsString String      @default("Stripe,BookingCom")
   featureFlagsString  String          @default("")
+  users          User[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 }
@@ -75,6 +79,8 @@ model User {
   lastName       String?
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id])
+  propertyId     String?
+  property       Property?     @relation(fields: [propertyId], references: [id])
   userRoles      UserRole[]
   shifts         Shift[]
   createdAt      DateTime      @default(now())

@@ -1,17 +1,42 @@
 {
-  "name": "HotelOS Commercial Property Management System",
-  "short_name": "HotelOS",
-  "description": "Premium commercial hotel PMS SaaS console",
+  "name": "HotelOS Enterprise Commercial PMS & Workforce System",
+  "short_name": "HotelOS Desktop",
+  "description": "Enterprise Hotel Operations, PMS, Point of Sale, and Workforce Management System",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#4f46e5",
-  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f766e",
+  "orientation": "any",
+  "categories": ["business", "productivity", "utilities"],
   "icons": [
     {
       "src": "/favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "type": "image/x-icon",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Front Desk Operations",
+      "url": "/frontdesk",
+      "description": "Quick access to Check-ins & Reservations"
+    },
+    {
+      "name": "HR & Workforce Hub",
+      "url": "/hr",
+      "description": "Employee Control Tower & Shift Scheduling"
+    },
+    {
+      "name": "Housekeeping Desk",
+      "url": "/housekeeping",
+      "description": "Room Cleaning & Maintenance Status"
+    },
+    {
+      "name": "SaaS Control Tower",
+      "url": "/reports/super-admin",
+      "description": "Super Admin Tenant Console"
     }
   ]
 }

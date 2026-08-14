@@ -1,10 +1,11 @@
 "use client";
 
-import { useSession, MOCK_STAFF_DIRECTORY, StaffRole } from "@/context/SessionContext";
-import { User, Key } from "lucide-react";
+import { useSession, StaffRole } from "@/context/SessionContext";
+import { User, LogOut } from "lucide-react";
+import DesktopInstallBanner from "@/components/layout/DesktopInstallBanner";
 
 export default function HeaderStaffSwitcher() {
-  const { currentUser, login } = useSession();
+  const { currentUser, logout } = useSession();
 
   const getRoleBadgeStyle = (role: StaffRole) => {
     switch (role) {
@@ -28,22 +29,35 @@ export default function HeaderStaffSwitcher() {
   if (!currentUser) return null;
 
   return (
-    <div className="flex items-center space-x-3 bg-surface border border-border-default rounded-lg px-3 py-1.5 shadow-xxs">
-      <div className="hidden md:block text-right">
-        <div className="text-xxs font-bold text-text-primary leading-none">{currentUser.name}</div>
-        <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{currentUser.email}</div>
-      </div>
-
-      <div className="h-8 w-px bg-border-default hidden md:block" />
-
-      <div className="flex items-center space-x-1.5">
-        <span className={`px-2 py-0.5 border rounded text-[9px] font-bold uppercase tracking-wider ${getRoleBadgeStyle(currentUser.role)}`}>
-          {currentUser.role}
-        </span>
-        
-        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center border border-border-default text-text-secondary">
-          <User className="w-3.5 h-3.5" />
+    <div className="flex items-center space-x-3">
+      <DesktopInstallBanner />
+      <div className="flex items-center space-x-3 bg-surface border border-border-default rounded-lg px-3 py-1.5 shadow-xxs">
+        <div className="hidden md:block text-right">
+          <div className="text-xxs font-bold text-text-primary leading-none">{currentUser.name}</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{currentUser.email}</div>
         </div>
+
+        <div className="h-8 w-px bg-border-default hidden md:block" />
+
+        <div className="flex items-center space-x-1.5">
+          <span className={`px-2 py-0.5 border rounded text-[9px] font-bold uppercase tracking-wider ${getRoleBadgeStyle(currentUser.role)}`}>
+            {currentUser.role}
+          </span>
+          
+          <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center border border-border-default text-text-secondary mr-2">
+            <User className="w-3.5 h-3.5" />
+          </div>
+        </div>
+
+        <div className="h-8 w-px bg-border-default" />
+
+        <button
+          onClick={logout}
+          title="Sign Out"
+          className="w-8 h-8 rounded-lg flex items-center justify-center border border-border-default hover:bg-rose-50 hover:text-rose-600 transition-all text-text-secondary cursor-pointer"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

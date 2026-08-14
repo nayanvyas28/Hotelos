@@ -11,6 +11,13 @@ export async function getSaaSSubscriptionsAction() {
     const orgs = await db.organization.findMany({
       include: {
         properties: true,
+        users: {
+          include: {
+            userRoles: {
+              include: { role: true },
+            },
+          },
+        },
         saasInvoices: {
           orderBy: { createdAt: "desc" },
         },

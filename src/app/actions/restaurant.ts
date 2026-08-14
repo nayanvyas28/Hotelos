@@ -136,8 +136,15 @@ export async function getRestaurantOverviewAction(propertyId: string) {
           });
         }
 
-        const mockGuest = await db.guest.create({
-          data: {
+        const mockGuest = await db.guest.upsert({
+          where: {
+            propertyId_email: {
+              propertyId,
+              email: "rahul.sharma@gmail.com",
+            },
+          },
+          update: {},
+          create: {
             propertyId,
             firstName: "Rahul",
             lastName: "Sharma",
